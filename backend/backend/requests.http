@@ -1,0 +1,35 @@
+### Authentification : Obtenir un token JWT
+POST http://127.0.0.1:8000/api/users/token/
+Content-Type: application/json
+
+{
+  "username": "moussa",
+  "password": "123"
+}
+
+### Rafraîchir un token JWT
+POST http://127.0.0.1:8000/api/users/token/refresh/
+Content-Type: application/json
+
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc0MjkwODkwMCwiaWF0IjoxNzQyODIyNTAwLCJqdGkiOiI2MWViOGI4MWI3ZmM0YWIyYTFhYTBmNTg0N2Y2NzliZSIsInVzZXJfaWQiOjF9.ay0uWYcj2ZD1ieEaxFggPKHEyVtfGhazUeE0VZjbjcc"
+}
+
+### Créer un incident (nécessite un token JWT)
+POST http://127.0.0.1:8000/api/incidents/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyODI2MTAwLCJpYXQiOjE3NDI4MjI1MDAsImp0aSI6IjIzNzg1MjdjM2YwNTRjYmM4M2M0NmUyNzNjNTRjYTEzIiwidXNlcl9pZCI6MX0.FKP6NYD_kDPW0oPRIPTmptLc834w4XpzEGs2DP6q5Uc
+
+{
+  "incident_type": "fire",
+  "description": "A fire broke out in the building.",
+  "location": "123 Main St, City"
+}
+
+### Lister tous les incidents (nécessite un token JWT)
+GET http://127.0.0.1:8000/api/incidents/
+Authorization: Bearer ton_access_token
+
+### Récupérer un incident spécifique (nécessite un token JWT)
+GET http://127.0.0.1:8000/api/incidents/1/
+Authorization: Bearer ton_access_token
