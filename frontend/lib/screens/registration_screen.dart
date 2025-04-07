@@ -48,11 +48,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         profilePicture: _profileImage,
       );
 
-      // Connexion automatique après inscription réussie
-      await AuthService.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
-      );
+     
       
       if (mounted) Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {

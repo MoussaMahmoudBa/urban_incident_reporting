@@ -22,14 +22,18 @@ class UserRegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {
-                    'status': 'error',
-                    'errors': serializer.errors,
-                    'message': 'Validation failed'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            user= serializer.save()
+            refresh = RefreshToken.for_user(user)    
+
+
+            return Response({  # Structure de réponse modifiée
+            'tokens': {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+            },
+            'user_id': user.id,
+        }, status=201)
+        
         
         try:
             # Création de l'utilisateur
@@ -172,27 +176,12 @@ def biometric_login(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def register_biometric(request):
-    """Enregistrement biométrique"""
-    print(f"Requête reçue - User: {request.user}")  # Log
-    serializer = BiometricAuthSerializer(data=request.data)
-
-    serializer = BiometricAuthSerializer(
-        data=request.data,
-        context={'request': request}
-        )
-    if not serializer.is_valid():
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
     try:
-        request.user.set_biometric_token(
-            serializer.validated_data['biometric_token']
-        )
+        token = request.data.get('biometric_token')
+        if not token:
+            return Response({'error': 'Token manquant'}, status=400)
+            
+        request.user.set_biometric_token(token)
         return Response({'status': 'success'})
     except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'error': str(e)}, status=400)

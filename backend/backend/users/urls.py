@@ -20,13 +20,13 @@ urlpatterns = [
     
     # Gestion utilisateurs
     path('register/', UserRegisterView.as_view(), name='user-register'),
-    path('users/', UserListCreateView.as_view(), name='user-list'),
-    path('users/me/', current_user, name='current-user'),
-    path('users/<int:pk>/', UserDetailView.as_view(), name='user-detail'),
+    path('', UserListCreateView.as_view(), name='user-list'),
+    path('me/', current_user, name='current-user'),
+    path('<int:pk>/', UserDetailView.as_view(), name='user-detail'),
     
     # Biométrie
-    path('users/biometric-login/', biometric_login, name='biometric-login'),
-    path('users/register-biometric/', register_biometric, name='register-biometric'),
+    path('biometric-login/', biometric_login, name='biometric-login'),
+    path('register-biometric/', register_biometric, name='register-biometric'),
     
     # Admin (facultatif)
     path('admin/users/', UserListCreateView.as_view(), name='admin-user-list'),

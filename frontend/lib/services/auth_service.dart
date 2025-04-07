@@ -9,7 +9,7 @@ import 'package:mime/mime.dart';
 
 class AuthService {
   static final _storage = FlutterSecureStorage();
-  static const String baseUrl = "http://10.0.2.2:8000/api/users/";
+  static const String baseUrl = "http://10.0.2.2:8000/api/";
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
   static const _userKey = 'current_user';
@@ -17,11 +17,58 @@ class AuthService {
   static const _biometricRegisteredKey = 'biometric_registered';
   static const _usernameKey = 'current_username'; // Nouvelle clé pour le username
 
+
+  // Nouvelle méthode pour vérifier et rafraîchir le token
+  static Future<String?> _getValidToken() async {
+    try {
+      final accessToken = await getAccessToken();
+      if (accessToken == null) return null;
+
+      // Décodage basique du token pour vérifier l'expiration
+      final parts = accessToken.split('.');
+      if (parts.length != 3) return accessToken;
+
+      final payload = json.decode(
+        utf8.decode(
+          base64Url.decode(
+            base64Url.normalize(parts[1]),
+          ),
+        ),
+      );
+
+      final exp = payload['exp'] as int;
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+      // Si le token expire dans moins de 5 minutes, on le rafraîchit
+      if (exp > now + 300) {
+        return accessToken;
+      }
+
+      log('Token expiré ou sur le point d\'expirer, rafraîchissement en cours...');
+      return await refreshToken();
+    } catch (e) {
+      log('Erreur lors de la vérification du token: $e');
+      return null;
+    }
+  }
+
+  // Nouvelle méthode pour obtenir les headers avec token valide
+  static Future<Map<String, String>> getAuthHeaders() async {
+    final token = await _getValidToken();
+    if (token == null) {
+      throw Exception('Session expirée - Veuillez vous reconnecter');
+    }
+    return {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
+  }
+
   static Future<User> login(String username, String password) async {
     try {
       // Étape 1: Authentification
       final authResponse = await http.post(
-        Uri.parse('${baseUrl}token/'),
+        Uri.parse('${baseUrl}users/token/'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'username': username, 'password': password}),
       );
@@ -37,10 +84,7 @@ class AuthService {
       // Étape 2: Récupération du profil
       final profileResponse = await http.get(
         Uri.parse('${baseUrl}users/me/'),
-        headers: {
-          'Authorization': 'Bearer ${tokens['access']}',
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(), // Utilisation de la nouvelle méthode
       );
 
       if (profileResponse.statusCode == 200) {
@@ -56,21 +100,23 @@ class AuthService {
   }
 
   static Future<User> getCurrentUser() async {
-    final token = await getAccessToken();
-    if (token == null) throw Exception('Non authentifié');
+    try {
+      final response = await http.get(
+        Uri.parse('${baseUrl}users/me/'),
+        headers: await getAuthHeaders(), // Utilisation de la nouvelle méthode
+      );
 
-    final response = await http.get(
-      Uri.parse('${baseUrl}users/me/'), // Correction: retirer le / avant users
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      return User.fromJson(json.decode(response.body));
-    } else {
-      throw Exception('Échec du chargement de l\'utilisateur');
+      if (response.statusCode == 200) {
+        return User.fromJson(json.decode(response.body));
+      } else if (response.statusCode == 401) {
+        await logout();
+        throw Exception('Session expirée - Veuillez vous reconnecter');
+      } else {
+        throw Exception('Échec du chargement de l\'utilisateur');
+      }
+    } catch (e) {
+      log('Erreur getCurrentUser: $e');
+      rethrow;
     }
   }
 
@@ -154,19 +200,29 @@ class AuthService {
   }
 
   static Future<String> refreshToken() async {
-    final refreshToken = await _storage.read(key: _refreshTokenKey);
-    final response = await http.post(
-      Uri.parse('${baseUrl}token/refresh/'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'refresh': refreshToken}),
-    );
+    try {
+      final refreshToken = await _storage.read(key: _refreshTokenKey);
+      if (refreshToken == null) {
+        throw Exception('Aucun refresh token disponible');
+      }
 
-    if (response.statusCode == 200) {
-      final tokens = json.decode(response.body);
-      await _saveTokens(tokens);
-      return tokens['access'];
-    } else {
-      throw Exception('Failed to refresh token');
+      final response = await http.post(
+        Uri.parse('${baseUrl}token/refresh/'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'refresh': refreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final tokens = json.decode(response.body);
+        await _saveTokens(tokens);
+        return tokens['access'];
+      } else {
+        await logout();
+        throw Exception('Échec du rafraîchissement du token');
+      }
+    } catch (e) {
+      await logout();
+      rethrow;
     }
   }
 
@@ -186,11 +242,10 @@ class AuthService {
     File? profilePicture,
   }) async {
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${baseUrl}register/'),
-      );
-
+      final uri = Uri.parse('${baseUrl}users/register/');
+    log('Tentative d\'inscription vers: $uri');  // ✅ Debug
+    final request = http.MultipartRequest('POST', uri);
+      
       // Headers
       request.headers.addAll({
         'Accept': 'application/json',
@@ -219,14 +274,18 @@ class AuthService {
       }
 
       final response = await http.Response.fromStream(await request.send());
+      log('Statut: ${response.statusCode}, Body: ${response.body}');  // ✅ Debug
+
       final responseBody = json.decode(utf8.decode(response.bodyBytes));
 
-      if (response.statusCode != 201) {
-        throw Exception(
-          _parseDjangoErrors(responseBody) ?? 
-          'Erreur d\'inscription (${response.statusCode})'
-        );
-      }
+if (response.statusCode == 201) {
+      final responseData = json.decode(utf8.decode(response.bodyBytes));
+      await _saveTokens(responseData['tokens']); // Sauvegarde des tokens
+      await _storage.write(key: _usernameKey, value: username);
+    } else {
+      throw Exception(_parseDjangoErrors(json.decode(utf8.decode(response.bodyBytes))));
+    }
+    
     } catch (e) {
       log('Erreur inscription: $e');
       rethrow;

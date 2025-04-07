@@ -10,28 +10,28 @@ import '../models/incident_hive.dart';
 
 class IncidentService {
   static const _storage = FlutterSecureStorage();
-  static const String _baseUrl = "http://127.0.0.1:8000/api/incidents/";
+  static const String _baseUrl = "http://10.0.2.2:8000/api/incidents/";
   static const String _boxName = 'incidentsBox';
 
-  // Nouvelle méthode pour synchroniser les incidents en attente
- static Future<void> syncPendingIncidents() async {
-  final connectivity = Connectivity();
-  final connectivityResult = await connectivity.checkConnectivity();
-  if (connectivityResult == ConnectivityResult.none) return;
+  static Future<void> syncPendingIncidents() async {
+    final connectivity = Connectivity();
+    final connectivityResult = await connectivity.checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) return;
 
-  final box = await Hive.openBox<IncidentHive>(_boxName);
-  final unsyncedIncidents = Map.from(box.toMap()).entries.where((entry) => !entry.value.isSynced);
+    final box = await Hive.openBox<IncidentHive>(_boxName);
+    final unsyncedIncidents = box.values.where((incident) => !incident.isSynced);
 
-  for (final entry in unsyncedIncidents) {
-    try {
-      await _sendIncidentToServer(entry.value);
-      entry.value.isSynced = true;
-      await box.put(entry.key, entry.value); // Utilise la clé de l'entrée
-    } catch (e) {
-      print('Échec de la synchro pour un incident: $e');
+    for (final incident in unsyncedIncidents) {
+      try {
+        await _sendIncidentToServer(incident);
+        incident.isSynced = true;
+        final key = box.keyAt(box.values.toList().indexOf(incident));
+        await box.put(key, incident);
+      } catch (e) {
+        print('Échec de la synchro pour un incident: $e');
+      }
     }
   }
-}
 
   static Future<List<Incident>> getUserIncidents() async {
     try {
@@ -50,7 +50,7 @@ class IncidentService {
       throw Exception('Failed to load incidents');
     } catch (e) {
       final box = await Hive.openBox<IncidentHive>(_boxName);
-      return box.values.map((hiveIncident) => Incident.fromHive(hiveIncident)).toList();
+      return box.values.map(Incident.fromHive).toList();
     }
   }
 
@@ -71,8 +71,6 @@ class IncidentService {
 
     final box = await Hive.openBox<IncidentHive>(_boxName);
     await box.add(incident);
-
-    // Tente de synchroniser immédiatement si connecté
     await syncPendingIncidents();
   }
 
@@ -87,26 +85,24 @@ class IncidentService {
       ..fields['location'] = incident.location;
 
     if (incident.imagePath != null && File(incident.imagePath!).existsSync()) {
-      final file = await http.MultipartFile.fromPath(
+      request.files.add(await http.MultipartFile.fromPath(
         'photo',
         incident.imagePath!,
         contentType: MediaType('image', 'jpeg'),
-      );
-      request.files.add(file);
+      ));
     }
 
     if (incident.audioPath != null && File(incident.audioPath!).existsSync()) {
-    final audioFile = await http.MultipartFile.fromPath(
-      'audio',
-      incident.audioPath!,
-      contentType: MediaType('audio', 'mpeg'),
-    );
-    request.files.add(audioFile);
-  }
+      request.files.add(await http.MultipartFile.fromPath(
+        'audio',
+        incident.audioPath!,
+        contentType: MediaType('audio', 'mpeg'),
+      ));
+    }
 
     final response = await request.send();
     if (response.statusCode != 201) {
-      throw Exception('Échec de l\'envoi au serveur: ${response.statusCode}');
+      throw Exception('Échec de l\'envoi: ${response.statusCode}');
     }
   }
 }

@@ -44,7 +44,13 @@ class _RegisterBiometricScreenState extends State<RegisterBiometricScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Activer la biométrie')),
+      appBar: AppBar(
+        title: Text('Activer la biométrie'),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: _isLoading ? null : () => Navigator.pop(context, false),
+        ),
+      ),
       body: Stack(
         children: [
           Center(

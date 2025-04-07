@@ -7,7 +7,7 @@ class IncidentHive {
   @HiveField(0) final String incidentType;
   @HiveField(1) final String description;
   @HiveField(2) final String? imagePath;
-  @HiveField(3) final String? audioPath; // Nouveau champ
+  @HiveField(3) final String? audioPath; 
   @HiveField(4) final String location;
   @HiveField(5) bool isSynced;
 
@@ -15,7 +15,7 @@ class IncidentHive {
     required this.incidentType,
     required this.description,
     this.imagePath,
-    this.audioPath, // Nouveau champ
+    this.audioPath, 
     required this.location,
     this.isSynced = false,
   });

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
+import 'register_biometric_screen.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   @override
@@ -60,6 +62,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text('Nom d\'utilisateur: ${_user?.username ?? "N/A"}'),
           Text('Email: ${_user?.email ?? "N/A"}'),
           Text('Téléphone: ${_user?.phoneNumber ?? "Non renseigné"}'),
+          SizedBox(height: 20),
+          FutureBuilder<bool>(
+            future: AuthService.isBiometricRegistered(),
+            builder: (context, snapshot) {
+              if (snapshot.data == false) {
+                return ElevatedButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RegisterBiometricScreen(),
+                    ),
+                  ),
+                  child: Text('Enregistrer empreinte biométrique'),
+                );
+              }
+              return Container();
+            },
+          ),
           SizedBox(height: 20),
           ElevatedButton(
             onPressed: () => AuthService.logout().then((_) {

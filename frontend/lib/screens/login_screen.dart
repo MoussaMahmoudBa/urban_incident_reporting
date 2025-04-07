@@ -60,7 +60,6 @@ class _LoginScreenState extends State<LoginScreen> {
           _isLoggedIn = true;
           _isLoading = false;
         });
-        await _checkBiometricRegistration();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Connecté avec succès!')),
         );

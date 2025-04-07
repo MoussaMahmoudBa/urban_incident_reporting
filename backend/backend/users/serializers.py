@@ -111,15 +111,7 @@ class BiometricAuthSerializer(serializers.Serializer):
         max_length=255,
         required=True
     )
-    username = serializers.CharField(
-        required=True,
-        allow_blank=True
-    )
+    
 
     def validate(self, data):
-        request = self.context.get('request')
-        if not data.get('username') and (not request or not request.user.is_authenticated):
-            raise serializers.ValidationError(
-                "Le nom d'utilisateur est requis pour les utilisateurs non authentifiés."
-            )
         return data

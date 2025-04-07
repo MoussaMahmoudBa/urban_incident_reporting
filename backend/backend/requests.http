@@ -33,3 +33,5 @@ Authorization: Bearer ton_access_token
 ### Récupérer un incident spécifique (nécessite un token JWT)
 GET http://127.0.0.1:8000/api/incidents/1/
 Authorization: Bearer ton_access_token
+
+

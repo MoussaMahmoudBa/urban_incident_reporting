@@ -1,11 +1,11 @@
-import 'incident_hive.dart'; // Ajoutez cet import
+import 'incident_hive.dart';
 
 class Incident {
   final int id;
   final String incidentType;
   final String description;
   final String? photoUrl;
-  final String? audioUrl; // Nouveau champ
+  final String? audioUrl;
   final String location;
   final DateTime createdAt;
   final int userId;
@@ -16,7 +16,7 @@ class Incident {
     required this.incidentType,
     required this.description,
     this.photoUrl,
-    this.audioUrl, // Nouveau champ
+    this.audioUrl,
     required this.location,
     required this.createdAt,
     required this.userId,
@@ -24,12 +24,20 @@ class Incident {
   });
 
   factory Incident.fromJson(Map<String, dynamic> json) {
+    String? parsePhotoUrl(dynamic photo) {
+      if (photo == null) return null;
+      if (photo is String) {
+        return photo.startsWith('http') ? photo : 'http://10.0.2.2:8000$photo';
+      }
+      return null;
+    }
+
     return Incident(
       id: json['id'],
       incidentType: json['incident_type'],
       description: json['description'],
-      photoUrl: json['photo'] != null ? 'http://127.0.0.1:8000${json['photo']}' : null,
-      audioUrl: json['audio'] != null ? 'http://127.0.0.1:8000${json['audio']}' : null, // Nouveau
+      photoUrl: parsePhotoUrl(json['photo']),
+      audioUrl: json['audio'] != null ? 'http://10.0.2.2:8000${json['audio']}' : null,
       location: json['location'],
       createdAt: DateTime.parse(json['created_at']),
       userId: json['user'],
@@ -42,7 +50,7 @@ class Incident {
       incidentType: hive.incidentType,
       description: hive.description,
       photoUrl: hive.imagePath,
-      audioUrl: hive.audioPath, // Nouveau
+      audioUrl: hive.audioPath,
       location: hive.location,
       createdAt: DateTime.now(),
       userId: 0,
@@ -55,6 +63,7 @@ class Incident {
       'incident_type': incidentType,
       'description': description,
       'photo': photoUrl,
+      'audio': audioUrl,
       'location': location,
       'user': userId,
     };
