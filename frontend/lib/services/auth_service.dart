@@ -87,16 +87,18 @@ class AuthService {
         headers: await getAuthHeaders(), // Utilisation de la nouvelle méthode
       );
 
-      if (profileResponse.statusCode == 200) {
-        return User.fromJson(json.decode(profileResponse.body));
-      } else {
-        throw Exception('Profil utilisateur introuvable');
-      }
-    } on SocketException {
-      throw Exception('Problème de connexion réseau');
-    } catch (e) {
-      throw Exception('Erreur de connexion: ${e.toString()}');
+     if (profileResponse.statusCode == 200) {
+      final user = User.fromJson(json.decode(profileResponse.body));
+      await _storage.write(key: _userKey, value: json.encode(user.toJson()));
+      return user;
+    } else {
+      throw Exception('Profil utilisateur introuvable');
     }
+  } on SocketException {
+    throw Exception('Problème de connexion réseau');
+  } catch (e) {
+    throw Exception('Erreur de connexion: ${e.toString()}');
+  }
   }
 
   static Future<User> getCurrentUser() async {

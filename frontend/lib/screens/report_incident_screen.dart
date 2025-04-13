@@ -14,6 +14,7 @@ class ReportIncidentScreen extends StatefulWidget {
 }
 
 class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
+  bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   String? _imagePath;
@@ -151,6 +152,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     }
 
     try {
+      setState(() => _isLoading = true);
+
       await IncidentService.reportIncident(
         incidentType: _selectedIncidentType!,
         description: _descriptionController.text,
@@ -164,8 +167,12 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: ${e.toString()}')),
-      );
+      );  
+    }finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
+  }
   }
 
   @override
@@ -280,8 +287,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 ),
               SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _submitReport,
-                child: Text('Envoyer le rapport'),
+                onPressed: _isLoading ? null : _submitReport,
+                child: _isLoading 
+                    ? CircularProgressIndicator(color: Colors.white)
+                    : Text('Envoyer le rapport'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: Size(double.infinity, 50),
                 ),

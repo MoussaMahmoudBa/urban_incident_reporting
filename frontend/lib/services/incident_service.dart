@@ -39,7 +39,7 @@ class IncidentService {
       if (token == null) throw Exception('Non authentifié');
 
       final response = await http.get(
-        Uri.parse(_baseUrl),
+        Uri.parse('$_baseUrl?user=me'), 
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -49,10 +49,40 @@ class IncidentService {
       }
       throw Exception('Failed to load incidents');
     } catch (e) {
-      final box = await Hive.openBox<IncidentHive>(_boxName);
-      return box.values.map(Incident.fromHive).toList();
+    final box = await Hive.openBox<IncidentHive>(_boxName);
+    final currentUserId = await _getCurrentUserId();
+    
+      
+    // On filtre aussi les incidents locaux par utilisateur
+    return box.values
+      .where((incident) => incident.userId == currentUserId)
+      .map(Incident.fromHive)
+      .toList();
     }
   }
+
+  static Future<int?> _getCurrentUserId() async {
+  try {
+    final token = await _storage.read(key: 'access_token');
+    if (token == null) return null;
+
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:8000/api/users/me/'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      final userData = json.decode(response.body);
+      return userData['id']; // Retourne l'ID de l'utilisateur
+    }
+    return null;
+  } catch (e) {
+    print('Erreur récupération userId: $e');
+    return null;
+  }
+}
+
+
 
   static Future<void> reportIncident({
     required String incidentType,
@@ -61,17 +91,29 @@ class IncidentService {
     required String location,
     String? audioPath,
   }) async {
+     try {
+    final userId = await _getCurrentUserId();
+    if (userId == null) throw Exception('Utilisateur non identifié');
+
     final incident = IncidentHive(
       incidentType: incidentType,
       description: description,
       imagePath: imagePath,
       location: location,
       audioPath: audioPath,
+      userId: userId,
     );
 
     final box = await Hive.openBox<IncidentHive>(_boxName);
     await box.add(incident);
+    
+    // Tenter la synchronisation immédiate
     await syncPendingIncidents();
+    
+  } catch (e) {
+    print('Erreur lors du signalement: $e');
+    rethrow;
+  }
   }
 
   static Future<void> _sendIncidentToServer(IncidentHive incident) async {

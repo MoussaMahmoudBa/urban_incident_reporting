@@ -26,6 +26,9 @@ class CustomUser(AbstractUser):
         null=True,
         verbose_name='Token biométrique'
     )
+    face_embedding = models.BinaryField(
+        null=True, 
+        blank=True)
 
     def set_biometric_token(self, raw_token):
         """Hash et stocke le token biométrique"""

@@ -1,29 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:typed_data'; // Ajout de cet import
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/report_incident_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/registration_screen.dart'; 
 import 'services/auth_service.dart';
 import 'models/incident_hive.dart';
-import 'services/connectivity_service.dart';
-import 'screens/registration_screen.dart'; // Ajoutez cette ligne
-import 'dart:io'; // Ajout pour File
 import 'package:geolocator/geolocator.dart';
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Geolocator.requestPermission();
-  await Hive.initFlutter();
-  Hive.registerAdapter(IncidentHiveAdapter());
-  await Hive.openBox<IncidentHive>('incidentsBox');
-
-  // Vérification de la configuration
-  debugPrint('Configuration initialisée - démarrage de l\'app');
+  
+  // Demande de permission de localisation
+  await _requestLocationPermission();
+  
+  // Initialisation de Hive
+  await _initializeHive();
   
   runApp(MyApp());
+}
+
+Future<void> _requestLocationPermission() async {
+  try {
+    await Geolocator.requestPermission();
+  } catch (e) {
+    debugPrint('Erreur permission localisation: $e');
+  }
+}
+
+Future<void> _initializeHive() async {
+  try {
+    await Hive.initFlutter();
+    Hive.registerAdapter(IncidentHiveAdapter());
+    
+    // Tentative normale d'ouverture
+    await Hive.openBox<IncidentHive>('incidentsBox');
+    debugPrint('Initialisation Hive réussie');
+  } catch (e) {
+    debugPrint('Erreur initialisation Hive: $e');
+    await _recoverFromHiveError();
+  }
+}
+
+Future<void> _recoverFromHiveError() async {
+  try {
+    // 1ère tentative: supprimer et recréer
+    await Hive.deleteBoxFromDisk('incidentsBox');
+    await Hive.openBox<IncidentHive>('incidentsBox');
+    debugPrint('Réinitialisation de la boîte réussie');
+  } catch (e) {
+    debugPrint('Échec réinitialisation: $e');
+    // 2ème tentative: version simplifiée
+    try {
+      await Hive.openBox<IncidentHive>('incidentsBox', bytes: Uint8List(0));
+      debugPrint('Boîte vide créée en mémoire');
+    } catch (e) {
+      debugPrint('Échec création boîte mémoire: $e');
+      // Dernier recours: utiliser une box temporaire
+      await Hive.openBox<IncidentHive>('temp_incidentsBox');
+    }
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -40,14 +79,6 @@ class MyApp extends StatelessWidget {
           centerTitle: true,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: Colors.blueAccent,
-          elevation: 4,
         ),
       ),
       routes: {
