@@ -49,30 +49,39 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loginWithCredentials() async {
-    setState(() => _isLoading = true);
-    try {
-      await AuthService.login(
-        _usernameController.text,
-        _passwordController.text,
+  setState(() => _isLoading = true);
+  try {
+    final user = await AuthService.login(
+      _usernameController.text,
+      _passwordController.text,
+    );
+    
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = true;
+        _isLoading = false;
+      });
+      
+      // Redirection basée sur le rôle
+      if (user.role == 'admin') {
+        Navigator.pushReplacementNamed(context, '/admin');
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connecté avec succès!')),
       );
-      if (mounted) {
-        setState(() {
-          _isLoggedIn = true;
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connecté avec succès!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
-        );
-      }
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: ${e.toString()}')),
+      );
     }
   }
+}
 
   Future<void> _registerBiometric() async {
     setState(() => _isLoading = true);

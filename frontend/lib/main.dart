@@ -10,6 +10,9 @@ import 'screens/registration_screen.dart';
 import 'services/auth_service.dart';
 import 'models/incident_hive.dart';
 import 'package:geolocator/geolocator.dart';
+import 'screens/admin_dashboard.dart'; // Ajouter cet import
+import '../models/user.dart'; // Ajoutez cette ligne
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,10 +91,30 @@ class MyApp extends StatelessWidget {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Scaffold(body: Center(child: CircularProgressIndicator()));
             }
-            return snapshot.hasData ? HomeScreen() : LoginScreen();
+            
+            if (snapshot.hasData) {
+              return FutureBuilder<User?>(
+                future: AuthService.getCurrentUser(),
+                builder: (context, userSnapshot) {
+                  if (userSnapshot.connectionState == ConnectionState.waiting) {
+                    return Scaffold(body: Center(child: CircularProgressIndicator()));
+                  }
+                  
+                  if (userSnapshot.hasData && userSnapshot.data != null) {
+                    final user = userSnapshot.data!;
+                    return user.role == 'admin' 
+                        ? AdminDashboardScreen() 
+                        : HomeScreen();
+                  }
+                  return LoginScreen();
+                },
+              );
+            }
+            return LoginScreen();
           },
         ),
         '/home': (context) => HomeScreen(),
+        '/admin': (context) => AdminDashboardScreen(),
         '/report': (context) => ReportIncidentScreen(),
         '/history': (context) => HistoryScreen(),
         '/profile': (context) => ProfileScreen(),

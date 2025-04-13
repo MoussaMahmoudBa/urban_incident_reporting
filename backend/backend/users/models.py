@@ -8,6 +8,13 @@ def user_profile_picture_path(instance, filename):
     return f'profile_pictures/user_{instance.id}/{filename}'
 
 class CustomUser(AbstractUser):
+
+    ROLE_CHOICES = [
+        ('citizen', 'Citoyen'),
+        ('admin', 'Administrateur'),
+    ]
+
+
     phone_number = models.CharField(
         max_length=15, 
         blank=True, 
@@ -29,7 +36,7 @@ class CustomUser(AbstractUser):
     face_embedding = models.BinaryField(
         null=True, 
         blank=True)
-
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='citizen')
     def set_biometric_token(self, raw_token):
         """Hash et stocke le token biométrique"""
         if raw_token:

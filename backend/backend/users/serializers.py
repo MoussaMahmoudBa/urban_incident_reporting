@@ -29,9 +29,10 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             'username', 
             'email', 
             'password',
-             'password2',  # Ajouté ici
+            'password2',  
             'phone_number',
-            'profile_picture'
+            'profile_picture',
+            'role'
         ]
         extra_kwargs = {
             'email': {
@@ -45,7 +46,9 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             'phone_number': {
                 'required': False,
                 'allow_blank': True
-            }
+            },
+            'role': {'read_only': True},
+            
         }
 
     def validate_email(self, value):
@@ -90,7 +93,8 @@ class UserSerializer(serializers.ModelSerializer):
             'profile_picture',
             'date_joined',
             'last_login',
-            'biometric_token'
+            'biometric_token',
+            'role'
         ]
         extra_kwargs = {
             'biometric_token': {'write_only': True},

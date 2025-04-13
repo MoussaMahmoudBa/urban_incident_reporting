@@ -10,6 +10,7 @@ from .serializers import (
     UserRegisterSerializer,
     BiometricAuthSerializer
 )
+from .permissions import IsAdminUser, IsCitizenUser
 
 User = get_user_model()
 
@@ -67,7 +68,7 @@ class UserListCreateView(generics.ListCreateAPIView):
     """Liste et création (admin seulement)"""
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser]  # Seuls les admins peuvent créer/lister
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -87,7 +88,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.request.method == 'DELETE':
+        if self.request.method in ['DELETE', 'PUT', 'PATCH']:
             return [IsAdminUser()]
         return [IsAuthenticated()]
 
