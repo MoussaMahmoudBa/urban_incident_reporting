@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:hive/hive.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io';
 import '../services/incident_service.dart';
 import '../models/incident.dart';
 import '../models/incident_hive.dart';
@@ -113,16 +114,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (incident.photoUrl != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          incident.photoUrl!,
-          width: 40,
-          height: 40,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => 
-            Icon(Icons.broken_image, color: Colors.grey),
-          loadingBuilder: (context, child, loadingProgress) =>
-            loadingProgress == null ? child : CircularProgressIndicator(),
-        ),
+        child: incident.photoUrl!.startsWith('http')
+          ? Image.network(
+              incident.photoUrl!,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => 
+                Icon(Icons.broken_image, color: Colors.grey),
+              loadingBuilder: (context, child, loadingProgress) =>
+                loadingProgress == null ? child : CircularProgressIndicator(),
+            )
+          : Image.file(
+              File(incident.photoUrl!),
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => 
+                Icon(Icons.broken_image, color: Colors.grey),
+            ),
       );
     }
     return Icon(
@@ -153,35 +163,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (incident.photoUrl != null)
-                  Container(
+                Container(
                   height: 200,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey[200],
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                    incident.photoUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Center(
-                      child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                      Icon(Icons.broken_image, size: 50, color: Colors.grey),
-                      Text('Image non disponible', style: TextStyle(color: Colors.grey)),
-            ],
-                      
-          ),
-    ),
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Center(child: CircularProgressIndicator());
-      },
-    ),
-  ),
-  ),
+                    child: incident.photoUrl!.startsWith('http')
+                      ? Image.network(
+                          incident.photoUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                Text('Image non disponible', style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return Center(child: CircularProgressIndicator());
+                          },
+                        )
+                      : Image.file(
+                          File(incident.photoUrl!),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                Text('Image non disponible', style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ),
+                  ),
+                ),
               SizedBox(height: 16),
               _buildDetailRow('Type', _getTypeLabel(incident.incidentType)),
               SizedBox(height: 8),

@@ -146,21 +146,30 @@ class IncidentService {
     }
   }
 
-  static Future<List<Incident>> getAllIncidents() async {
-    try {
-      final headers = await AuthService.getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$_baseUrl?all=true'),
-        headers: headers,
-      );
+   static Future<List<Incident>> getAllIncidents() async {
+  try {
+    final token = await _storage.read(key: 'access_token');
+    if (token == null) throw Exception('Non authentifié');
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => Incident.fromJson(json)).toList();
-      }
-      throw Exception('Failed to load incidents');
-    } catch (e) {
-      throw Exception('Erreur: $e');
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:8000/api/incidents/'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    print('Réponse brute: ${response.body}'); // Debug crucial
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      print('Nombre d\'incidents reçus: ${data.length}');
+      return data.map((json) => Incident.fromJson(json)).toList();
     }
+    throw Exception('Erreur serveur: ${response.statusCode}');
+  } catch (e) {
+    print('ERREUR FATALE dans getAllIncidents: $e');
+    rethrow;
   }
+}
 }

@@ -11,6 +11,8 @@ from .views import (
     biometric_login,
     register_biometric,
     login_view,
+    UserStatsView,
+    toggle_user_status,
 )
 
 urlpatterns = [
@@ -30,4 +32,11 @@ urlpatterns = [
     
     # Admin (facultatif)
     path('admin/users/', UserListCreateView.as_view(), name='admin-user-list'),
+
+     # Statistiques et gestion admin
+    path('stats/', UserStatsView.as_view(), name='user-stats'),
+    path('<int:user_id>/toggle-status/', toggle_user_status, name='toggle-user-status'),
+
+     # Authentification personnalisée
+    path('login/', login_view, name='login'),
 ]

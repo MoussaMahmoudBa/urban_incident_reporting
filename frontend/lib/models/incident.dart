@@ -25,12 +25,17 @@ class Incident {
 
   factory Incident.fromJson(Map<String, dynamic> json) {
     String? parsePhotoUrl(dynamic photo) {
-      if (photo == null) return null;
-      if (photo is String) {
-        return photo.startsWith('http') ? photo : 'http://10.0.2.2:8000$photo';
-      }
-      return null;
-    }
+  if (photo == null) return null;
+  if (photo is String) {
+    // Si c'est déjà une URL complète (pour les incidents en ligne)
+    if (photo.startsWith('http')) return photo;
+    // Si c'est un chemin local (pour les incidents hors ligne)
+    if (photo.startsWith('/')) return 'http://10.0.2.2:8000$photo';
+    // Si c'est un chemin de fichier local (pour Hive)
+    return photo;
+  }
+  return null;
+}
 
     return Incident(
       id: json['id'],

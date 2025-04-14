@@ -11,8 +11,77 @@ from .serializers import (
     BiometricAuthSerializer
 )
 from .permissions import IsAdminUser, IsCitizenUser
+from rest_framework.views import APIView
+from django.db.models import Count
+from django.http import JsonResponse
+from rest_framework.pagination import PageNumberPagination
+
 
 User = get_user_model()
+
+
+
+# Ajouter cette classe pour les statistiques utilisateurs
+class UserStatsView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        # Nombre total d'utilisateurs (non admin)
+        total_users = User.objects.filter(role='citizen').count()
+        
+        # Utilisateurs les plus actifs (avec nombre d'incidents)
+        active_users = User.objects.filter(role='citizen').annotate(
+            incident_count=Count('incidents')
+        ).order_by('-incident_count')[:5]
+        
+        # Formatage des données
+        active_users_data = [
+            {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'incident_count': user.incident_count
+            } 
+            for user in active_users
+        ]
+        
+        return Response({
+            'total_users': total_users,
+            'most_active_users': active_users_data
+        })
+
+
+# Ajouter cette vue pour activer/désactiver un utilisateur
+@api_view(['PATCH'])
+@permission_classes([IsAdminUser])
+def toggle_user_status(request, user_id):
+    try:
+        user = User.objects.get(id=user_id)
+        is_active = request.data.get('is_active', None)
+        
+        if is_active is None:
+            return Response(
+                {'error': 'Le champ is_active est requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user.is_active = is_active
+        user.save()
+        
+        # Invalider les tokens si désactivation
+        if not is_active:
+            user.auth_token_set.all().delete()
+        
+        return Response({
+            'status': 'success',
+            'is_active': user.is_active
+        })
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Utilisateur non trouvé'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
 
 class UserRegisterView(generics.CreateAPIView):
     """Inscription publique des utilisateurs"""
@@ -66,9 +135,21 @@ class UserRegisterView(generics.CreateAPIView):
 
 class UserListCreateView(generics.ListCreateAPIView):
     """Liste et création (admin seulement)"""
-    queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUser]  # Seuls les admins peuvent créer/lister
+    permission_classes = [IsAdminUser]
+    pagination_class = PageNumberPagination
+    def get_queryset(self):
+        queryset = User.objects.all()
+        exclude_admins = self.request.query_params.get('exclude_admins')
+        if exclude_admins:
+            queryset = queryset.filter(role='citizen')
+        
+        # Filtre par statut actif
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        return queryset.order_by('-date_joined')
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -80,7 +161,8 @@ class UserListCreateView(generics.ListCreateAPIView):
             status=status.HTTP_201_CREATED,
             headers=headers
         )
-
+    
+    
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Détail utilisateur"""
     queryset = User.objects.all()
