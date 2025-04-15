@@ -6,6 +6,7 @@ import '../models/incident.dart';
 import '../models/user.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
@@ -51,23 +52,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  Future<Map<String, dynamic>> _loadStats() async {
+Future<Map<String, dynamic>> _loadStats() async {
     try {
+      // Récupère les données de l'API
+      final apiStats = await IncidentService.getIncidentStats();
+      
+      // Charge les données supplémentaires nécessaires
       final incidents = await IncidentService.getAllIncidents();
       final allUsers = await UserService.getAllUsers();
       final nonAdminUsers = await UserService.getNonAdminUsers();
+
+      // Mise à jour des marqueurs pour la carte
+      setState(() {
+        _markers.clear();
+        _markers.addAll(incidents.map((incident) {
+          final parts = incident.location.split(',');
+          final lat = double.tryParse(parts[0]) ?? 48.8566;
+          final lng = double.tryParse(parts[1]) ?? 2.3522;
+          
+          return Marker(
+            width: 40,
+            height: 40,
+            point: LatLng(lat, lng),
+            child: Icon(
+              Icons.location_pin,
+              color: Colors.red,
+              size: 40,
+            ),
+          );
+        }));
+      });
+
+      // Statistiques des 7 derniers jours (calcul côté client)
+      final now = DateTime.now();
+      final last7Days = List.generate(7, (i) => 
+        DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i)));
       
-      // Calcul des statistiques
-      final totalIncidents = incidents.length;
-      final totalNonAdminUsers = nonAdminUsers.length;
-      
-      // Trouver les utilisateurs les plus actifs (non admin)
+      final incidentsLast7Days = last7Days.map((day) {
+        final count = incidents.where((incident) => 
+          incident.createdAt.year == day.year &&
+          incident.createdAt.month == day.month &&
+          incident.createdAt.day == day.day
+        ).length;
+        
+        return {
+          'date': '${day.day}/${day.month}',
+          'count': count
+        };
+      }).toList();
+
+      // Trouver les utilisateurs les plus actifs (calcul côté client)
       final userIncidentCount = <int, int>{};
       for (var incident in incidents) {
         final user = allUsers.firstWhere(
           (u) => u.id == incident.userId, 
-          orElse: () => User(id: -1, username: 'Inconnu', email: '', role: '')
-        );
+          orElse: () => User(id: -1, username: 'Inconnu', email: '', role: ''));
         if (user.role != 'admin') {
           userIncidentCount[incident.userId] = (userIncidentCount[incident.userId] ?? 0) + 1;
         }
@@ -79,25 +118,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final topActiveUsers = sortedUsers.take(3).map((e) {
         final user = allUsers.firstWhere(
           (u) => u.id == e.key, 
-          orElse: () => User(id: -1, username: 'Inconnu', email: '', role: '')
-        );
+          orElse: () => User(id: -1, username: 'Inconnu', email: '', role: ''));
         return {
           'user': user,
           'count': e.value,
         };
       }).toList();
 
+      // Combine les données de l'API avec les calculs côté client
       return {
-        'totalIncidents': totalIncidents,
-        'totalNonAdminUsers': totalNonAdminUsers,
-        'topActiveUsers': topActiveUsers,
-        'recentIncidents': incidents.take(5).toList(),
+        'total_incidents': apiStats['total_incidents'] ?? incidents.length,
+        'total_non_admin_users': apiStats['total_non_admin_users'] ?? nonAdminUsers.length,
+        'incidents_by_type': apiStats['incidents_by_type'] ?? incidents.fold<Map<String, int>>({}, (map, incident) {
+          map[incident.incidentType] = (map[incident.incidentType] ?? 0) + 1;
+          return map;
+        }).entries.map((e) => {
+          'incident_type': e.key,
+          'count': e.value
+        }).toList(),
+        'incidents_last_7_days': incidentsLast7Days,
+        'top_users': topActiveUsers,
+        'recent_incidents': incidents.take(5).toList(),
       };
     } catch (e) {
       print('Erreur dans _loadStats: $e');
       rethrow;
     }
   }
+
+
+
 
   Future<void> _loadIncidentsForMap() async {
     try {
@@ -147,14 +197,122 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildUserCard(User user, int incidentCount) {
+  Widget _buildTypeChart(List<dynamic> typeData) {
+    return SizedBox(
+      height: 300,
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          barTouchData: BarTouchData(enabled: true),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index >= 0 && index < typeData.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        typeData[index]['incident_type'].toString(),
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    );
+                  }
+                  return const Text('');
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  return Text(value.toInt().toString());
+                },
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: true),
+          barGroups: typeData.asMap().entries.map((entry) {
+            final index = entry.key;
+            final data = entry.value;
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: data['count'].toDouble(),
+                  color: Colors.blue,
+                  width: 20,
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimelineChart(List<dynamic> timelineData) {
+    return SizedBox(
+      height: 300,
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(show: true),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index >= 0 && index < timelineData.length) {
+                    return Text(timelineData[index]['date'].toString());
+                  }
+                  return const Text('');
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  return Text(value.toInt().toString());
+                },
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: true),
+          lineBarsData: [
+            LineChartBarData(
+              spots: timelineData.asMap().entries.map((entry) {
+                return FlSpot(
+                  entry.key.toDouble(),
+                  entry.value['count'].toDouble(),
+                );
+              }).toList(),
+              isCurved: false,
+              color: Colors.green,
+              barWidth: 4,
+              dotData: FlDotData(show: true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserStatsCard(Map<String, dynamic> userData) {
     return Card(
-      margin: EdgeInsets.symmetric(vertical: 4),
+      margin: EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: CircleAvatar(child: Text(user.username[0])),
-        title: Text(user.username),
-        subtitle: Text('${user.email} - ${user.role}'),
-        trailing: Chip(label: Text('$incidentCount signalements')),
+        leading: CircleAvatar(child: Text(userData['user'].username[0])),
+        title: Text(userData['user'].username),
+        subtitle: Text(userData['user'].email),
+        trailing: Chip(
+          label: Text('${userData['count']} signalements'),
+          backgroundColor: Colors.blue[100],
+        ),
       ),
     );
   }
@@ -206,7 +364,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Statut utilisateur mis à jour')),
       );
-      _loadData(); // Recharger les données
+      _loadData();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: ${e.toString()}')),
@@ -250,76 +408,88 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _statsFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         }
-        
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Center(child: Text('Erreur de chargement des statistiques'));
+        }
+
         final stats = snapshot.data!;
+        
         return SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Statistiques générales', 
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                SizedBox(height: 16),
-                Row(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Statistiques des incidents', 
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              SizedBox(height: 20),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatsCard(
+                      'Total incidents',
+                      '${stats['total_incidents']}',
+                      Icons.report_problem,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: _buildStatsCard(
+                      'Utilisateurs actifs',
+                      '${stats['total_non_admin_users']}',
+                      Icons.people,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              
+              Text('Incidents par type', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(height: 10),
+              _buildTypeChart(stats['incidents_by_type']),
+              SizedBox(height: 20),
+              
+              Text('Évolution sur 7 jours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(height: 10),
+              _buildTimelineChart(stats['incidents_last_7_days']),
+              SizedBox(height: 20),
+              
+              Text('Top utilisateurs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(height: 10),
+              ...(stats['top_users'] as List).map<Widget>((user) => _buildUserStatsCard(user)).toList(),
+              SizedBox(height: 20),
+              
+              Text('Derniers incidents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(height: 10),
+              ...(stats['recent_incidents'] as List<Incident>).map((incident) => 
+                _buildIncidentCard(incident)
+              ).toList(),
+              SizedBox(height: 20),
+              
+              Text('Carte des incidents', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              Container(
+                height: 300,
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: LatLng(48.8566, 2.3522),
+                    initialZoom: 12.0,
+                  ),
                   children: [
-                    Expanded(
-                      child: _buildStatsCard(
-                        'Incidents signalés',
-                        '${stats['totalIncidents']}',
-                        Icons.report,
-                      ),
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.app',
                     ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: _buildStatsCard(
-                        'Utilisateurs (non-admin)',
-                        '${stats['totalNonAdminUsers']}',
-                        Icons.people,
-                      ),
-                    ),
+                    MarkerLayer(markers: _markers),
                   ],
                 ),
-                SizedBox(height: 16),
-                Text('Utilisateurs les plus actifs', 
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                ...(stats['topActiveUsers'] as List).map((userData) => 
-                  _buildUserCard(userData['user'], userData['count'])
-                ).toList(),
-                SizedBox(height: 16),
-                Text('Derniers incidents', 
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                ...(stats['recentIncidents'] as List<Incident>).map((incident) => 
-                  _buildIncidentCard(incident)
-                ).toList(),
-                SizedBox(height: 16),
-                Text('Carte des incidents', 
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                Container(
-                  height: 300,
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: LatLng(48.8566, 2.3522),
-                      initialZoom: 12.0,
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.app',
-                      ),
-                      MarkerLayer(markers: _markers),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

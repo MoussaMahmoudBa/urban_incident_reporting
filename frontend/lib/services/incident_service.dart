@@ -146,30 +146,51 @@ class IncidentService {
     }
   }
 
-   static Future<List<Incident>> getAllIncidents() async {
+static Future<List<Incident>> getAllIncidents() async {
   try {
     final token = await _storage.read(key: 'access_token');
     if (token == null) throw Exception('Non authentifié');
 
     final response = await http.get(
-      Uri.parse('http://10.0.2.2:8000/api/incidents/'),
+      Uri.parse('http://10.0.2.2:8000/api/incidents/all/'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
     );
 
-    print('Réponse brute: ${response.body}'); // Debug crucial
-
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
-      print('Nombre d\'incidents reçus: ${data.length}');
       return data.map((json) => Incident.fromJson(json)).toList();
     }
     throw Exception('Erreur serveur: ${response.statusCode}');
   } catch (e) {
-    print('ERREUR FATALE dans getAllIncidents: $e');
+    print('Erreur dans getAllIncidents: $e');
     rethrow;
   }
 }
+
+static Future<Map<String, dynamic>> getIncidentStats() async {
+  try {
+    final token = await _storage.read(key: 'access_token');
+    if (token == null) throw Exception('Non authentifié');
+
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:8000/api/incidents/stats/'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    throw Exception('Erreur serveur: ${response.statusCode}');
+  } catch (e) {
+    print('Erreur dans getIncidentStats: $e');
+    rethrow;
+  }
+}
+
 }
