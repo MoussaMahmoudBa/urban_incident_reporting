@@ -22,6 +22,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
   String _errorMessage = '';
   int _selectedTabIndex = 0;
+  bool _isDarkMode = false;
+
+
+  // Couleurs dynamiques
+  Color get _primaryColor => _isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F9FF);
+  Color get _secondaryColor => _isDarkMode ? const Color(0xFF1A237E) : const Color(0xFF1565C0);
+  Color get _accentColor => _isDarkMode ? const Color(0xFF64B5F6) : const Color(0xFF0D47A1);
+  Color get _primaryTextColor => _isDarkMode ? Colors.white : Colors.grey[900]!;
+  Color get _secondaryTextColor => _isDarkMode ? Colors.white.withOpacity(0.9) : Colors.grey[800]!;
+  Color get _cardColor => _isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
+
 
   @override
   void initState() {
@@ -180,17 +191,26 @@ Future<Map<String, dynamic>> _loadStats() async {
     }
   }
 
+
+
   Widget _buildStatsCard(String title, String value, IconData icon) {
     return Card(
+      color: _cardColor,
+      elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(icon, size: 40, color: Colors.blue),
-            SizedBox(height: 8),
-            Text(title, style: TextStyle(fontSize: 16)),
-            SizedBox(height: 8),
-            Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Icon(icon, size: 40, color: _accentColor),
+            const SizedBox(height: 8),
+            Text(title, style: TextStyle(fontSize: 16, color: _primaryTextColor)),
+            const SizedBox(height: 8),
+            Text(value, 
+                style: TextStyle(
+                  fontSize: 24, 
+                  fontWeight: FontWeight.bold,
+                  color: _accentColor,
+                )),
           ],
         ),
       ),
@@ -216,7 +236,10 @@ Future<Map<String, dynamic>> _loadStats() async {
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Text(
                         typeData[index]['incident_type'].toString(),
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _secondaryTextColor,
+                        ),
                       ),
                     );
                   }
@@ -228,12 +251,25 @@ Future<Map<String, dynamic>> _loadStats() async {
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
-                  return Text(value.toInt().toString());
+                  return Text(
+                    value.toInt().toString(),
+                    style: TextStyle(color: _secondaryTextColor),
+                  );
                 },
               ),
             ),
           ),
-          borderData: FlBorderData(show: true),
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: _secondaryTextColor.withOpacity(0.3)),
+          ),
+          gridData: FlGridData(
+            show: true,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: _secondaryTextColor.withOpacity(0.1),
+              strokeWidth: 1,
+            ),
+          ),
           barGroups: typeData.asMap().entries.map((entry) {
             final index = entry.key;
             final data = entry.value;
@@ -242,8 +278,9 @@ Future<Map<String, dynamic>> _loadStats() async {
               barRods: [
                 BarChartRodData(
                   toY: data['count'].toDouble(),
-                  color: Colors.blue,
+                  color: _accentColor,
                   width: 20,
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ],
             );
@@ -258,7 +295,13 @@ Future<Map<String, dynamic>> _loadStats() async {
       height: 300,
       child: LineChart(
         LineChartData(
-          gridData: FlGridData(show: true),
+          gridData: FlGridData(
+            show: true,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: _secondaryTextColor.withOpacity(0.1),
+              strokeWidth: 1,
+            ),
+          ),
           titlesData: FlTitlesData(
             show: true,
             bottomTitles: AxisTitles(
@@ -267,7 +310,13 @@ Future<Map<String, dynamic>> _loadStats() async {
                 getTitlesWidget: (value, meta) {
                   final index = value.toInt();
                   if (index >= 0 && index < timelineData.length) {
-                    return Text(timelineData[index]['date'].toString());
+                    return Text(
+                      timelineData[index]['date'].toString(),
+                      style: TextStyle(
+                        color: _secondaryTextColor,
+                        fontSize: 10,
+                      ),
+                    );
                   }
                   return const Text('');
                 },
@@ -277,12 +326,18 @@ Future<Map<String, dynamic>> _loadStats() async {
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
-                  return Text(value.toInt().toString());
+                  return Text(
+                    value.toInt().toString(),
+                    style: TextStyle(color: _secondaryTextColor),
+                  );
                 },
               ),
             ),
           ),
-          borderData: FlBorderData(show: true),
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: _secondaryTextColor.withOpacity(0.3)),
+          ),
           lineBarsData: [
             LineChartBarData(
               spots: timelineData.asMap().entries.map((entry) {
@@ -292,9 +347,21 @@ Future<Map<String, dynamic>> _loadStats() async {
                 );
               }).toList(),
               isCurved: false,
-              color: Colors.green,
+              color: _accentColor,
               barWidth: 4,
-              dotData: FlDotData(show: true),
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                  radius: 4,
+                  color: _accentColor,
+                  strokeWidth: 2,
+                  strokeColor: _cardColor,
+                ),
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                color: _accentColor.withOpacity(0.2),
+              ),
             ),
           ],
         ),
@@ -304,14 +371,30 @@ Future<Map<String, dynamic>> _loadStats() async {
 
   Widget _buildUserStatsCard(Map<String, dynamic> userData) {
     return Card(
-      margin: EdgeInsets.only(bottom: 8),
+      color: _cardColor,
+      margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: CircleAvatar(child: Text(userData['user'].username[0])),
-        title: Text(userData['user'].username),
-        subtitle: Text(userData['user'].email),
+        leading: CircleAvatar(
+          backgroundColor: _accentColor,
+          child: Text(
+            userData['user'].username[0],
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+        title: Text(
+          userData['user'].username,
+          style: TextStyle(color: _primaryTextColor),
+        ),
+        subtitle: Text(
+          userData['user'].email,
+          style: TextStyle(color: _secondaryTextColor),
+        ),
         trailing: Chip(
-          label: Text('${userData['count']} signalements'),
-          backgroundColor: Colors.blue[100],
+          label: Text(
+            '${userData['count']} signalements',
+            style: TextStyle(color: _accentColor),
+          ),
+          backgroundColor: _accentColor.withOpacity(0.1),
         ),
       ),
     );
@@ -319,14 +402,21 @@ Future<Map<String, dynamic>> _loadStats() async {
 
   Widget _buildIncidentCard(Incident incident) {
     return Card(
-      margin: EdgeInsets.symmetric(vertical: 4),
+      color: _cardColor,
+      margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        title: Text(incident.description.length > 30 
-            ? '${incident.description.substring(0, 30)}...' 
-            : incident.description),
-        subtitle: Text('${incident.incidentType} - ${incident.formattedDate}'),
+        title: Text(
+          incident.description.length > 30 
+              ? '${incident.description.substring(0, 30)}...' 
+              : incident.description,
+          style: TextStyle(color: _primaryTextColor),
+        ),
+        subtitle: Text(
+          '${incident.incidentType} - ${incident.formattedDate}',
+          style: TextStyle(color: _secondaryTextColor),
+        ),
         trailing: IconButton(
-          icon: Icon(Icons.arrow_forward),
+          icon: Icon(Icons.arrow_forward, color: _accentColor),
           onPressed: () => _showIncidentDetails(incident),
         ),
       ),
@@ -335,21 +425,41 @@ Future<Map<String, dynamic>> _loadStats() async {
 
   Widget _buildUserManagementCard(User user) {
     return Card(
-      margin: EdgeInsets.symmetric(vertical: 4),
+      color: _cardColor,
+      margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
-        leading: CircleAvatar(child: Text(user.username[0])),
-        title: Text(user.username),
-        subtitle: Text(user.email),
+        leading: CircleAvatar(
+          backgroundColor: _accentColor,
+          child: Text(
+            user.username[0],
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+        title: Text(
+          user.username,
+          style: TextStyle(color: _primaryTextColor),
+        ),
+        subtitle: Text(
+          user.email,
+          style: TextStyle(color: _secondaryTextColor),
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Chip(label: Text(user.role)),
+            Chip(
+              label: Text(
+                user.role,
+                style: TextStyle(color: Colors.white),
+              ),
+              backgroundColor: _accentColor,
+            ),
+            const SizedBox(width: 8),
             IconButton(
-              icon: Icon(Icons.block, color: Colors.red),
+              icon: Icon(Icons.block, color: Colors.red[400]),
               onPressed: () => _toggleUserStatus(user.id, false),
             ),
             IconButton(
-              icon: Icon(Icons.check_circle, color: Colors.green),
+              icon: Icon(Icons.check_circle, color: Colors.green[400]),
               onPressed: () => _toggleUserStatus(user.id, true),
             ),
           ],
@@ -409,84 +519,138 @@ Future<Map<String, dynamic>> _loadStats() async {
       future: _statsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(color: _accentColor),
+          );
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
-          return Center(child: Text('Erreur de chargement des statistiques'));
+          return Center(
+            child: Text(
+              'Erreur de chargement des statistiques',
+              style: TextStyle(color: _primaryTextColor),
+            ),
+          );
         }
 
         final stats = snapshot.data!;
         
         return SingleChildScrollView(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Statistiques des incidents', 
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              SizedBox(height: 20),
+              Text(
+                'Statistiques des incidents', 
+                style: TextStyle(
+                  fontSize: 20, 
+                  fontWeight: FontWeight.bold,
+                  color: _primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 20),
               
               Row(
                 children: [
-                  Expanded(
-                    child: _buildStatsCard(
-                      'Total incidents',
-                      '${stats['total_incidents']}',
-                      Icons.report_problem,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: _buildStatsCard(
-                      'Utilisateurs actifs',
-                      '${stats['total_non_admin_users']}',
-                      Icons.people,
-                    ),
-                  ),
+                  Expanded(child: _buildStatsCard('Total incidents', '${stats['total_incidents']}', Icons.report_problem)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _buildStatsCard('Utilisateurs actifs', '${stats['total_non_admin_users']}', Icons.people)),
                 ],
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               
-              Text('Incidents par type', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 10),
+              Text(
+                'Incidents par type', 
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: _primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 10),
               _buildTypeChart(stats['incidents_by_type']),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               
-              Text('Évolution sur 7 jours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 10),
+              Text(
+                'Évolution sur 7 jours', 
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: _primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 10),
               _buildTimelineChart(stats['incidents_last_7_days']),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               
-              Text('Top utilisateurs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 10),
-              ...(stats['top_users'] as List).map<Widget>((user) => _buildUserStatsCard(user)).toList(),
-              SizedBox(height: 20),
+              Text(
+                'Top utilisateurs', 
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: _primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...(stats['top_users'] as List).map((user) => _buildUserStatsCard(user)),
+              const SizedBox(height: 20),
               
-              Text('Derniers incidents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 10),
-              ...(stats['recent_incidents'] as List<Incident>).map((incident) => 
-                _buildIncidentCard(incident)
-              ).toList(),
-              SizedBox(height: 20),
+              Text(
+                'Derniers incidents', 
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: _primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...(stats['recent_incidents'] as List<Incident>).map((incident) => _buildIncidentCard(incident)),
+              const SizedBox(height: 20),
               
-              Text('Carte des incidents', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
+              Text(
+                'Carte des incidents', 
+                style: TextStyle(
+                  fontSize: 20, 
+                  fontWeight: FontWeight.bold,
+                  color: _primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
               Container(
                 height: 300,
-                child: FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: LatLng(48.8566, 2.3522),
-                    initialZoom: 12.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.app',
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _secondaryTextColor.withOpacity(0.2)),
+                  color: _isDarkMode ? Colors.black : Colors.blue[50],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: const LatLng(48.8566, 2.3522),
+                      initialZoom: 12.0,
                     ),
-                    MarkerLayer(markers: _markers),
-                  ],
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        subdomains: const ['a', 'b', 'c'],
+                        userAgentPackageName: 'com.example.app',
+                      ),
+                      MarkerLayer(
+                        markers: _markers.map((marker) => Marker(
+                          width: 40,
+                          height: 40,
+                          point: marker.point,
+                          child: Icon(
+                            Icons.location_pin,
+                            color: _accentColor,
+                            size: 40,
+                          ),
+                        )).toList(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -501,19 +665,27 @@ Future<Map<String, dynamic>> _loadStats() async {
       future: UserService.getNonAdminUsers(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(color: _accentColor),
+          );
         }
         
         if (snapshot.hasError) {
-          return Center(child: Text('Erreur: ${snapshot.error}'));
+          return Center(
+            child: Text(
+              'Erreur: ${snapshot.error}',
+              style: TextStyle(color: _primaryTextColor),
+            ),
+          );
         }
         
         final users = snapshot.data ?? [];
         
         return RefreshIndicator(
+          color: _accentColor,
           onRefresh: _loadData,
           child: ListView.builder(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             itemCount: users.length,
             itemBuilder: (context, index) {
               final user = users[index];
@@ -528,15 +700,30 @@ Future<Map<String, dynamic>> _loadStats() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _primaryColor,
       appBar: AppBar(
-        title: const Text('Tableau de bord Admin'),
+        title: const Text(
+          'Tableau de bord Admin',
+          style: TextStyle(color: Colors.white),
+        ),
+        centerTitle: true,
+        backgroundColor: _secondaryColor,
+        elevation: 1,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: Icon(
+              _isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
+              color: Colors.white,
+            ),
+            onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _loadData,
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => AuthService.logout().then((_) {
               Navigator.pushReplacementNamed(context, '/');
             }),
@@ -544,16 +731,24 @@ Future<Map<String, dynamic>> _loadStats() async {
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: _accentColor))
           : _errorMessage.isNotEmpty
-              ? Center(child: Text(_errorMessage))
+              ? Center(
+                  child: Text(
+                    _errorMessage,
+                    style: TextStyle(color: _primaryTextColor),
+                  ),
+                )
               : _selectedTabIndex == 0 
                   ? _buildStatsTab()
                   : _buildUsersTab(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedTabIndex,
         onTap: (index) => setState(() => _selectedTabIndex = index),
-        items: [
+        backgroundColor: _secondaryColor,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
+        items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),
             label: 'Statistiques',

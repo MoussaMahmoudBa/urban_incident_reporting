@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:hive/hive.dart';
@@ -7,8 +8,11 @@ import 'dart:io';
 import '../services/incident_service.dart';
 import '../models/incident.dart';
 import '../models/incident_hive.dart';
+import '../theme_provider.dart';
 
 class HistoryScreen extends StatefulWidget {
+  const HistoryScreen({Key? key}) : super(key: key);
+
   @override
   _HistoryScreenState createState() => _HistoryScreenState();
 }
@@ -19,7 +23,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Incident? _selectedIncident;
   bool _showMap = false;
   bool _isSyncing = false;
-  LatLng _initialCenter = LatLng(48.8566, 2.3522); // Paris par défaut
+  LatLng _initialCenter = const LatLng(48.8566, 2.3522);
 
   @override
   void initState() {
@@ -38,7 +42,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final box = await Hive.openBox<IncidentHive>('incidentsBox');
       final localIncidents = box.values.map((i) => Incident.fromHive(i)).toList();
       
-      // Fusionne et élimine les doublons
       final allIncidents = [...onlineIncidents, ...localIncidents.where((i) => !i.isSynced)];
       return allIncidents.fold<List<Incident>>([], (list, incident) {
         if (!list.any((i) => 
@@ -89,7 +92,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final parts = location.split(',');
       return LatLng(double.parse(parts[0]), double.parse(parts[1]));
     } catch (e) {
-      return _initialCenter; // Retourne la position par défaut en cas d'erreur
+      return _initialCenter;
     }
   }
 
@@ -98,15 +101,40 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       await IncidentService.syncPendingIncidents();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Synchronisation réussie!')),
+        const SnackBar(
+          content: Text('Synchronisation réussie!'),
+        ),
       );
       await _loadIncidents();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur de synchronisation: ${e.toString()}')),
+        SnackBar(
+          content: Text('Erreur de synchronisation: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() => _isSyncing = false);
+    }
+  }
+
+  Future<void> _openMaps(String location) async {
+    try {
+      final latLng = _parseLocation(location);
+      final url = 'https://www.google.com/maps/search/?api=1&query=${latLng.latitude},${latLng.longitude}';
+      
+      if (await canLaunch(url)) {
+        await launch(url);
+      } else {
+        throw 'Impossible d\'ouvrir Google Maps';
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -121,9 +149,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               height: 40,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => 
-                Icon(Icons.broken_image, color: Colors.grey),
+                const Icon(Icons.broken_image, color: Colors.grey),
               loadingBuilder: (context, child, loadingProgress) =>
-                loadingProgress == null ? child : CircularProgressIndicator(),
+                loadingProgress == null ? child : const CircularProgressIndicator(),
             )
           : Image.file(
               File(incident.photoUrl!),
@@ -131,7 +159,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               height: 40,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => 
-                Icon(Icons.broken_image, color: Colors.grey),
+                const Icon(Icons.broken_image, color: Colors.grey),
             ),
       );
     }
@@ -151,12 +179,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showIncidentDetails(Incident incident) {
-    setState(() => _selectedIncident = incident);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Détails complet', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: themeProvider.cardColor,
+        title: Text(
+          'Détails complet',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: themeProvider.textColor,
+          ),
+        ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,10 +201,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Container(
                   height: 200,
                   width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey[200],
-                  ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: incident.photoUrl!.startsWith('http')
@@ -180,15 +211,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.broken_image, size: 50, color: Colors.grey),
-                                Text('Image non disponible', style: TextStyle(color: Colors.grey)),
+                                const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                Text(
+                                  'Image non disponible',
+                                  style: TextStyle(color: themeProvider.textColor),
+                                ),
                               ],
                             ),
                           ),
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return Center(child: CircularProgressIndicator());
-                          },
                         )
                       : Image.file(
                           File(incident.photoUrl!),
@@ -197,36 +227,59 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.broken_image, size: 50, color: Colors.grey),
-                                Text('Image non disponible', style: TextStyle(color: Colors.grey)),
+                                const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                Text(
+                                  'Image non disponible',
+                                  style: TextStyle(color: themeProvider.textColor),
+                                ),
                               ],
                             ),
                           ),
                         ),
                   ),
                 ),
-              SizedBox(height: 16),
-              _buildDetailRow('Type', _getTypeLabel(incident.incidentType)),
-              SizedBox(height: 8),
-              _buildDetailRow('Description', incident.description),
-              SizedBox(height: 8),
-              _buildDetailRow('Localisation', incident.location),
-              SizedBox(height: 8),
-              _buildDetailRow('Date', incident.formattedDate),
-              SizedBox(height: 8),
+              const SizedBox(height: 16),
+              Text(
+                'Type: ${_getTypeLabel(incident.incidentType)}',
+                style: TextStyle(color: themeProvider.textColor),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Description: ${incident.description}',
+                style: TextStyle(color: themeProvider.textColor),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Localisation: ${incident.location}',
+                style: TextStyle(color: themeProvider.textColor),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Date: ${incident.formattedDate}',
+                style: TextStyle(color: themeProvider.textColor),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  Text('Statut: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Statut: ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: themeProvider.textColor,
+                    ),
+                  ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: incident.isSynced ? Colors.green[100] : Colors.orange[100],
+                      color: incident.isSynced 
+                        ? Colors.green.withOpacity(themeProvider.isDarkMode ? 0.3 : 0.2)
+                        : Colors.orange.withOpacity(themeProvider.isDarkMode ? 0.3 : 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       incident.isSynced ? 'Synchronisé' : 'En attente',
                       style: TextStyle(
-                        color: incident.isSynced ? Colors.green[800] : Colors.orange[800],
+                        color: incident.isSynced ? Colors.green : Colors.orange,
                       ),
                     ),
                   ),
@@ -237,11 +290,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         actions: [
           TextButton(
-            child: Text('Fermer'),
+            child: Text(
+              'Fermer',
+              style: TextStyle(color: themeProvider.accentColor),
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            child: Text('Ouvrir dans Maps'),
+            child: Text(
+              'Ouvrir dans Maps',
+              style: TextStyle(color: themeProvider.accentColor),
+            ),
             onPressed: () {
               Navigator.pop(context);
               _openMaps(incident.location);
@@ -252,31 +311,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 4),
-        Text(value),
-        Divider(height: 16),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Historique des incidents'),
+        title: const Text('Historique des incidents', style: TextStyle(color: Colors.white)),
+        backgroundColor: themeProvider.primaryColor,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: Icon(Icons.sync),
+            icon: Icon(themeProvider.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round, color: Colors.white),
+            onPressed: () => themeProvider.toggleTheme(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.sync, color: Colors.white),
             onPressed: _isSyncing ? null : _syncIncidents,
             tooltip: 'Synchroniser',
           ),
           IconButton(
-            icon: Icon(_showMap ? Icons.list : Icons.map),
+            icon: Icon(_showMap ? Icons.list : Icons.map, color: Colors.white),
             onPressed: () {
               setState(() => _showMap = !_showMap);
               if (_showMap && _markers.isNotEmpty) {
@@ -287,10 +342,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ],
       ),
-      body: _showMap ? _buildMap() : _buildList(),
+      backgroundColor: themeProvider.backgroundColor,
+      body: _showMap ? _buildMap(themeProvider) : _buildList(themeProvider),
       floatingActionButton: _selectedIncident != null && _showMap
           ? FloatingActionButton(
-              child: Icon(Icons.directions),
+              backgroundColor: themeProvider.accentColor,
+              child: const Icon(Icons.directions, color: Colors.white),
               onPressed: () => _openMaps(_selectedIncident!.location),
               tooltip: 'Itinéraire',
             )
@@ -298,7 +355,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildMap() {
+  Widget _buildMap(ThemeProvider themeProvider) {
     return Stack(
       children: [
         FlutterMap(
@@ -317,17 +374,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
         ),
         if (_isSyncing)
-          Center(child: CircularProgressIndicator()),
+          Center(
+            child: CircularProgressIndicator(
+              color: themeProvider.accentColor,
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(ThemeProvider themeProvider) {
     return FutureBuilder<List<Incident>>(
       future: _loadAllIncidents(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(
+              color: themeProvider.accentColor,
+            ),
+          );
         }
 
         if (snapshot.hasError) {
@@ -335,12 +400,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error, color: Colors.red, size: 48),
-                SizedBox(height: 16),
-                Text('Erreur de chargement'),
+                const Icon(Icons.error, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Erreur de chargement',
+                  style: TextStyle(color: themeProvider.textColor),
+                ),
                 TextButton(
                   onPressed: _loadIncidents,
-                  child: Text('Réessayer'),
+                  child: Text(
+                    'Réessayer',
+                    style: TextStyle(color: themeProvider.accentColor),
+                  ),
                 ),
               ],
             ),
@@ -354,69 +425,69 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.history, size: 48, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('Aucun incident signalé'),
+                Icon(
+                  Icons.history,
+                  size: 48,
+                  color: themeProvider.textColor.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Aucun incident signalé',
+                  style: TextStyle(color: themeProvider.textColor),
+                ),
               ],
             ),
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: _loadIncidents,
-          child: ListView.builder(
-            itemCount: incidents.length,
-            itemBuilder: (context, index) {
-              final incident = incidents[index];
-              return Card(
-                margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                elevation: 2,
-                child: ListTile(
-                  leading: _buildIncidentIcon(incident),
-                  title: Text(
-                    _getTypeLabel(incident.incidentType),
-                    style: TextStyle(fontWeight: FontWeight.bold),
+      return RefreshIndicator(
+        onRefresh: _loadIncidents,
+        color: themeProvider.accentColor,
+        child: ListView.builder(
+          itemCount: incidents.length,
+          itemBuilder: (context, index) {
+            final incident = incidents[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              elevation: 2,
+              color: themeProvider.cardColor,
+              child: ListTile(
+                leading: _buildIncidentIcon(incident),
+                title: Text(
+                  _getTypeLabel(incident.incidentType),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: themeProvider.textColor,
                   ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        incident.description.length > 30 
-                          ? '${incident.description.substring(0, 30)}...' 
-                          : incident.description,
-                      ),
-                      SizedBox(height: 4),
-                      Text(incident.formattedDate),
-                    ],
-                  ),
-                  trailing: Icon(
-                    incident.isSynced ? Icons.cloud_done : Icons.cloud_off,
-                    color: incident.isSynced ? Colors.green : Colors.orange,
-                  ),
-                  onTap: () => _showIncidentDetails(incident),
                 ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _openMaps(String location) async {
-    try {
-      final latLng = _parseLocation(location);
-      final url = 'https://www.google.com/maps/search/?api=1&query=${latLng.latitude},${latLng.longitude}';
-      
-      if (await canLaunch(url)) {
-        await launch(url);
-      } else {
-        throw 'Impossible d\'ouvrir Google Maps';
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      incident.description.length > 30 
+                        ? '${incident.description.substring(0, 30)}...' 
+                        : incident.description,
+                      style: TextStyle(color: themeProvider.textColor.withOpacity(0.8)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      incident.formattedDate,
+                      style: TextStyle(color: themeProvider.textColor.withOpacity(0.6)),
+                    ),
+                  ],
+                ),
+                trailing: Icon(
+                  incident.isSynced ? Icons.cloud_done : Icons.cloud_off,
+                  color: incident.isSynced ? Colors.green : Colors.orange,
+                ),
+                onTap: () => _showIncidentDetails(incident),
+              ),
+            );
+          },
+        ),
       );
-    }
-  }
+    },
+  );
 }
+}
+

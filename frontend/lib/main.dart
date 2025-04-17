@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'dart:typed_data'; // Ajout de cet import
+import 'dart:typed_data'; 
+import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/report_incident_screen.dart';
@@ -10,8 +11,9 @@ import 'screens/registration_screen.dart';
 import 'services/auth_service.dart';
 import 'models/incident_hive.dart';
 import 'package:geolocator/geolocator.dart';
-import 'screens/admin_dashboard.dart'; // Ajouter cet import
-import '../models/user.dart'; // Ajoutez cette ligne
+import 'screens/admin_dashboard.dart'; 
+import '../models/user.dart'; 
+import 'theme_provider.dart';
 
 
 void main() async {
@@ -23,7 +25,12 @@ void main() async {
   // Initialisation de Hive
   await _initializeHive();
   
-  runApp(MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: MyApp(),
+    ),
+  );
 }
 
 Future<void> _requestLocationPermission() async {
@@ -71,25 +78,41 @@ Future<void> _recoverFromHiveError() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return MaterialApp(
       title: 'Signalement Urbain',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+        primaryColor: const Color(0xFF1565C0),
+        colorScheme: ColorScheme.light(
+          primary: const Color(0xFF1565C0),
+          secondary: const Color(0xFF0D47A1),
+        ),
         appBarTheme: AppBarTheme(
-          elevation: 0,
-          centerTitle: true,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
+          color: const Color(0xFF1565C0),
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
       ),
+      darkTheme: ThemeData.dark().copyWith(
+        primaryColor: const Color(0xFF1A237E),
+        colorScheme: ColorScheme.dark(
+          primary: const Color(0xFF1A237E),
+          secondary: const Color(0xFF64B5F6),
+        ),
+        appBarTheme: AppBarTheme(
+          color: const Color(0xFF1A237E),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        cardColor: const Color(0xFF1E1E1E),
+      ),
+      themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       routes: {
         '/': (context) => FutureBuilder<String?>(
           future: AuthService.getAccessToken(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return Scaffold(body: Center(child: CircularProgressIndicator()));
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
             }
             
             if (snapshot.hasData) {
@@ -97,28 +120,28 @@ class MyApp extends StatelessWidget {
                 future: AuthService.getCurrentUser(),
                 builder: (context, userSnapshot) {
                   if (userSnapshot.connectionState == ConnectionState.waiting) {
-                    return Scaffold(body: Center(child: CircularProgressIndicator()));
+                    return const Scaffold(body: Center(child: CircularProgressIndicator()));
                   }
                   
                   if (userSnapshot.hasData && userSnapshot.data != null) {
                     final user = userSnapshot.data!;
                     return user.role == 'admin' 
-                        ? AdminDashboardScreen() 
-                        : HomeScreen();
+                        ? const AdminDashboardScreen() 
+                        : const HomeScreen();
                   }
-                  return LoginScreen();
+                  return const LoginScreen();
                 },
               );
             }
-            return LoginScreen();
+            return const LoginScreen();
           },
         ),
-        '/home': (context) => HomeScreen(),
-        '/admin': (context) => AdminDashboardScreen(),
-        '/report': (context) => ReportIncidentScreen(),
-        '/history': (context) => HistoryScreen(),
-        '/profile': (context) => ProfileScreen(),
-        '/register': (context) => RegistrationScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/admin': (context) => const AdminDashboardScreen(),
+        '/report': (context) => const ReportIncidentScreen(),
+        '/history': (context) => const HistoryScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/register': (context) => const RegistrationScreen(),
       },
       initialRoute: '/',
     );

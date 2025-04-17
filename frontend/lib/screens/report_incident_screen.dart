@@ -9,12 +9,15 @@ import '../services/incident_service.dart';
 import 'dart:io';
 
 class ReportIncidentScreen extends StatefulWidget {
+
+  const ReportIncidentScreen({Key? key}) : super(key: key);
   @override
   _ReportIncidentScreenState createState() => _ReportIncidentScreenState();
 }
 
 class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   bool _isLoading = false;
+  bool _isDarkMode = false;
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   String? _imagePath;
@@ -23,11 +26,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   bool _showMap = false;
   LatLng? _selectedPosition;
   final MapController _mapController = MapController();
-
-  // Reconnaissance vocale
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   String _lastWords = '';
+
+  // Couleurs dynamiques
+  Color get _primaryColor => _isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F9FF);
+  Color get _secondaryColor => _isDarkMode ? const Color(0xFF1A237E) : const Color(0xFF1565C0);
+  Color get _accentColor => _isDarkMode ? const Color(0xFF64B5F6) : const Color(0xFF0D47A1);
+  Color get _textColor => _isDarkMode ? Colors.white : Colors.grey[900]!;
+  Color get _cardColor => _isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
 
   @override
   void initState() {
@@ -178,38 +186,71 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Signaler un incident')),
+      appBar: AppBar(
+        title: Text('Signaler un incident', style: TextStyle(color: Colors.white)),
+        backgroundColor: _secondaryColor,
+        actions: [
+          IconButton(
+            icon: Icon(_isDarkMode ? Icons.wb_sunny : Icons.nightlight_round, color: Colors.white),
+            onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+          ),
+        ],
+      ),
+      backgroundColor: _primaryColor,
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
             children: [
               DropdownButtonFormField<String>(
                 value: _selectedIncidentType,
-                items: incidentTypes.map((type) {
+                items: [
+                  {'value': 'fire', 'label': 'Incendie'},
+                  {'value': 'accident', 'label': 'Accident'},
+                  {'value': 'theft', 'label': 'Vol'},
+                  {'value': 'other', 'label': 'Autre'},
+                ].map((type) {
                   return DropdownMenuItem(
                     value: type['value'],
-                    child: Text(type['label']!),
+                    child: Text(type['label']!, style: TextStyle(color: _textColor)),
                   );
                 }).toList(),
                 onChanged: (value) => setState(() => _selectedIncidentType = value),
-                decoration: InputDecoration(labelText: 'Type d\'incident'),
+                decoration: InputDecoration(
+                  labelText: 'Type d\'incident',
+                  labelStyle: TextStyle(color: _textColor.withOpacity(0.8)),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: _textColor.withOpacity(0.5)),
+                  ),
+                ),
+                style: TextStyle(color: _textColor),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               if (_imagePath != null) 
-                Image.file(File(_imagePath!), height: 200),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(File(_imagePath!), height: 200),
+                ),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentColor,
+                ),
                 onPressed: _takePhoto,
-                child: Text('Choisir une photo'),
+                child: Text('Choisir une photo', style: TextStyle(color: Colors.white)),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _descriptionController,
+                style: TextStyle(color: _textColor),
                 decoration: InputDecoration(
                   labelText: 'Description',
+                  labelStyle: TextStyle(color: _textColor.withOpacity(0.8)),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: _textColor.withOpacity(0.5)),
+                  ),
                   suffixIcon: IconButton(
-                    icon: Icon(_isListening ? Icons.mic_off : Icons.mic),
+                    icon: Icon(_isListening ? Icons.mic_off : Icons.mic, color: _accentColor),
                     onPressed: () {
                       if (_isListening) {
                         _stopListening();
@@ -227,26 +268,36 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Text(
                     _lastWords.isEmpty ? 'Écoute...' : _lastWords,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: _textColor.withOpacity(0.6)),
                   ),
                 ),
-              SizedBox(height: 20),
-              Text(_selectedLocation != null
-                  ? 'Localisation: $_selectedLocation'
-                  : 'Localisation non sélectionnée'),
+              const SizedBox(height: 20),
+              Text(
+                _selectedLocation != null 
+                    ? 'Localisation: $_selectedLocation' 
+                    : 'Localisation non sélectionnée',
+                style: TextStyle(color: _textColor),
+              ),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accentColor,
+                      ),
                       onPressed: _getCurrentLocation,
-                      child: Text('Localisation actuelle'),
+                      child: Text('Localisation actuelle', style: TextStyle(color: Colors.white)),
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accentColor,
+                      ),
                       onPressed: _openMapPicker,
-                      child: Text('Choisir sur la carte'),
+                      child: Text('Choisir sur la carte', style: TextStyle(color: Colors.white)),
                     ),
                   ),
                 ],
@@ -254,10 +305,15 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               if (_showMap)
                 Container(
                   height: 300,
+                  margin: const EdgeInsets.only(top: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _accentColor),
+                  ),
                   child: FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
-                      initialCenter: _selectedPosition ?? LatLng(48.8566, 2.3522),
+                      initialCenter: _selectedPosition ?? const LatLng(48.8566, 2.3522),
                       initialZoom: 12.0,
                       onTap: (tapPosition, point) {
                         setState(() {
@@ -285,15 +341,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                     ],
                   ),
                 ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isLoading ? null : _submitReport,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentColor,
+                  minimumSize: const Size(double.infinity, 50),
+                ),
                 child: _isLoading 
                     ? CircularProgressIndicator(color: Colors.white)
-                    : Text('Envoyer le rapport'),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
-                ),
+                    : Text('Envoyer le rapport', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),

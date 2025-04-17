@@ -4,6 +4,9 @@ import '../services/biometric_auth_service.dart';
 import 'registration_screen.dart'; // Import de l'écran d'inscription
 
 class LoginScreen extends StatefulWidget {
+
+  const LoginScreen({Key? key}) : super(key: key);
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -16,6 +19,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isBiometricReady = false;
   bool _isLoading = false;
   bool _isLoggedIn = false;
+  bool _isDarkMode = false;
+
+  // Couleurs dynamiques
+  Color get _primaryColor => _isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F9FF);
+  Color get _secondaryColor => _isDarkMode ? const Color(0xFF1A237E) : const Color(0xFF1565C0);
+  Color get _accentColor => _isDarkMode ? const Color(0xFF64B5F6) : const Color(0xFF0D47A1);
+  Color get _textColor => _isDarkMode ? Colors.white : Colors.grey[900]!;
+  Color get _secondaryTextColor => _isDarkMode ? Colors.white70 : Colors.grey[800]!;
 
   @override
   void initState() {
@@ -150,92 +161,149 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _primaryColor,
       appBar: AppBar(
-        title: Text('Connexion'),
+        title: const Text('CONNEXION', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+        backgroundColor: _secondaryColor,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          IconButton(
+            icon: Icon(_isDarkMode ? Icons.wb_sunny : Icons.nightlight_round, 
+                     color: Colors.white),
+            onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+          ),
           if (_isLoggedIn)
             IconButton(
-              icon: Icon(Icons.logout),
+              icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: _isLoading ? null : _logout,
             ),
         ],
       ),
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                if (!_isLoggedIn) ...[
-                  TextField(
-                    controller: _usernameController,
-                    decoration: InputDecoration(labelText: 'Nom d\'utilisateur'),
-                  ),
-                  TextField(
-                    controller: _passwordController,
-                    decoration: InputDecoration(labelText: 'Mot de passe'),
-                    obscureText: true,
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _loginWithCredentials,
-                    child: Text('Se connecter'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: Size(double.infinity, 50),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  // Ajout du bouton "Créer un compte"
-                  TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => RegistrationScreen(),
-                              ),
-                            ),
-                    child: Text(
-                      'Créer un compte',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  _primaryColor,
+                  _isDarkMode ? const Color(0xFF1A1A1A) : const Color(0xFFE3F2FD),
                 ],
-                if (_isBiometricAvailable) ...[
-                  SizedBox(height: 20),
-                  if (_isBiometricReady)
-                    ElevatedButton.icon(
-                      icon: Icon(Icons.fingerprint),
-                      label: Text('Connexion biométrique'),
-                      onPressed: _isLoading ? null : _loginWithBiometrics,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: Size(double.infinity, 50),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!_isLoggedIn) ...[
+                    TextField(
+                      controller: _usernameController,
+                      decoration: InputDecoration(
+                        labelText: 'Nom d\'utilisateur',
+                        labelStyle: TextStyle(color: _textColor),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: _secondaryTextColor),
+                        ),
                       ),
+                      style: TextStyle(color: _textColor),
                     ),
-                  if (!_isBiometricReady && _isLoggedIn) ...[
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Mot de passe',
+                        labelStyle: TextStyle(color: _textColor),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: _secondaryTextColor),
+                        ),
+                      ),
+                      obscureText: true,
+                      style: TextStyle(color: _textColor),
+                    ),
+                    const SizedBox(height: 30),
                     ElevatedButton(
-                      onPressed: _isLoading ? null : _registerBiometric,
-                      child: Text('Enregistrer empreinte digitale'),
+                      onPressed: _isLoading ? null : _loginWithCredentials,
+                      child: Text(
+                        'SE CONNECTER',
+                        style: TextStyle(color: Colors.white),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        minimumSize: Size(double.infinity, 50),
+                        backgroundColor: _accentColor,
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                    SizedBox(height: 10),
-                    Text(
-                      'Enregistrez votre empreinte pour une connexion plus rapide',
-                      style: TextStyle(color: Colors.grey),
-                      textAlign: TextAlign.center,
+                    const SizedBox(height: 15),
+                    TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => RegistrationScreen(),
+                                ),
+                              ),
+                      child: Text(
+                        'Créer un compte',
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ],
+                  if (_isBiometricAvailable) ...[
+                    const SizedBox(height: 30),
+                    if (_isBiometricReady)
+                      ElevatedButton.icon(
+                        icon: Icon(Icons.fingerprint, color: Colors.white),
+                        label: Text(
+                          'Connexion biométrique',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onPressed: _isLoading ? null : _loginWithBiometrics,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accentColor,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    if (!_isBiometricReady && _isLoggedIn) ...[
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _registerBiometric,
+                        child: Text(
+                          'Enregistrer empreinte',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accentColor,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Enregistrez votre empreinte pour une connexion plus rapide',
+                        style: TextStyle(color: _secondaryTextColor),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           if (_isLoading)

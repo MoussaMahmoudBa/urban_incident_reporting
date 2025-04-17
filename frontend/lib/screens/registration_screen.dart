@@ -7,6 +7,8 @@ import '../services/auth_service.dart';
 import '../models/user.dart';
 
 class RegistrationScreen extends StatefulWidget {
+
+  const RegistrationScreen({Key? key}) : super(key: key);
   @override
   _RegistrationScreenState createState() => _RegistrationScreenState();
 }
@@ -16,10 +18,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController(); // Nouveau champ
+  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   File? _profileImage;
   bool _isLoading = false;
+  bool _isDarkMode = false;
+
+  // Couleurs dynamiques
+  Color get _primaryColor => _isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F9FF);
+  Color get _secondaryColor => _isDarkMode ? const Color(0xFF1A237E) : const Color(0xFF1565C0);
+  Color get _accentColor => _isDarkMode ? const Color(0xFF64B5F6) : const Color(0xFF0D47A1);
+  Color get _textColor => _isDarkMode ? Colors.white : Colors.grey[900]!;
+  Color get _secondaryTextColor => _isDarkMode ? Colors.white70 : Colors.grey[800]!;
 
   Future<void> _pickImage() async {
     final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -69,12 +79,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Créer un compte')),
+      backgroundColor: _primaryColor,
+      appBar: AppBar(
+        title: const Text('INSCRIPTION', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+        backgroundColor: _secondaryColor,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: Icon(_isDarkMode ? Icons.wb_sunny : Icons.nightlight_round, 
+                     color: Colors.white),
+            onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
           child: Column(
@@ -82,31 +105,55 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               GestureDetector(
                 onTap: _pickImage,
                 child: CircleAvatar(
-                  radius: 50,
+                  radius: 60,
+                  backgroundColor: _secondaryColor.withOpacity(0.2),
                   backgroundImage: _profileImage != null 
                       ? FileImage(_profileImage!) 
                       : null,
                   child: _profileImage == null 
-                      ? Icon(Icons.add_a_photo, size: 40) 
+                      ? Icon(Icons.add_a_photo, size: 40, color: _textColor) 
                       : null,
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 30),
               TextFormField(
                 controller: _usernameController,
-                decoration: InputDecoration(labelText: 'Nom d\'utilisateur*'),
+                decoration: InputDecoration(
+                  labelText: 'Nom d\'utilisateur*',
+                  labelStyle: TextStyle(color: _textColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: _secondaryTextColor),
+                  ),
+                ),
+                style: TextStyle(color: _textColor),
                 validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
               ),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _emailController,
-                decoration: InputDecoration(labelText: 'Email*'),
+                decoration: InputDecoration(
+                  labelText: 'Email*',
+                  labelStyle: TextStyle(color: _textColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: _secondaryTextColor),
+                  ),
+                ),
+                style: TextStyle(color: _textColor),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) => 
                     !value!.contains('@') ? 'Email invalide' : null,
               ),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Mot de passe*'),
+                decoration: InputDecoration(
+                  labelText: 'Mot de passe*',
+                  labelStyle: TextStyle(color: _textColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: _secondaryTextColor),
+                  ),
+                ),
+                style: TextStyle(color: _textColor),
                 obscureText: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Champ obligatoire';
@@ -115,33 +162,60 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _confirmPasswordController,
-                decoration: InputDecoration(labelText: 'Confirmer le mot de passe*'),
+                decoration: InputDecoration(
+                  labelText: 'Confirmer le mot de passe*',
+                  labelStyle: TextStyle(color: _textColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: _secondaryTextColor),
+                  ),
+                ),
+                style: TextStyle(color: _textColor),
                 obscureText: true,
                 validator: (value) => 
                     value != _passwordController.text ? 'Ne correspond pas' : null,
               ),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _phoneController,
-                decoration: InputDecoration(labelText: 'Téléphone (optionnel)'),
+                decoration: InputDecoration(
+                  labelText: 'Téléphone (optionnel)',
+                  labelStyle: TextStyle(color: _textColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: _secondaryTextColor),
+                  ),
+                ),
+                style: TextStyle(color: _textColor),
                 keyboardType: TextInputType.phone,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: _isLoading ? null : _register,
                 child: _isLoading 
                     ? CircularProgressIndicator(color: Colors.white)
-                    : Text('S\'inscrire'),
+                    : Text(
+                        'S\'INSCRIRE',
+                        style: TextStyle(color: Colors.white),
+                      ),
                 style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
+                  backgroundColor: _accentColor,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
+              const SizedBox(height: 15),
               TextButton(
                 onPressed: _isLoading 
                     ? null 
                     : () => Navigator.pop(context),
-                child: Text('Déjà un compte ? Se connecter'),
+                child: Text(
+                  'Déjà un compte ? Se connecter',
+                  style: TextStyle(color: _accentColor),
+                ),
               ),
             ],
           ),
@@ -149,7 +223,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ),
     );
   }
-
+  
   @override
   void dispose() {
     _usernameController.dispose();
