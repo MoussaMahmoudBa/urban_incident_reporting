@@ -11,6 +11,144 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+class AddAdminDialog extends StatefulWidget {
+  final Function() onAdminCreated;
+
+  const AddAdminDialog({Key? key, required this.onAdminCreated}) : super(key: key);
+
+  @override
+  _AddAdminDialogState createState() => _AddAdminDialogState();
+}
+
+class _AddAdminDialogState extends State<AddAdminDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _phoneController = TextEditingController();
+  bool _isSubmitting = false;
+  final _storage = FlutterSecureStorage();
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final token = await _storage.read(key: 'access_token');
+      if (token == null) throw Exception('Non authentifié');
+
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:8000/api/users/admin/register/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'username': _usernameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text.trim(),
+          'password2': _confirmPasswordController.text.trim(),
+          'phone_number': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        widget.onAdminCreated();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Admin créé avec succès!'))
+        );
+      } else {
+        throw Exception(json.decode(response.body).toString());
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: ${e.toString().replaceFirst('Exception: ', '')}'))
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Ajouter un administrateur'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _usernameController,
+                decoration: InputDecoration(labelText: 'Nom d\'utilisateur*'),
+                validator: (value) => value?.isEmpty ?? true ? 'Ce champ est requis' : null,
+              ),
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(labelText: 'Email*'),
+                validator: (value) => value?.isEmpty ?? true ? 'Email invalide' : null,
+              ),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(labelText: 'Mot de passe*'),
+                validator: (value) => value?.isEmpty ?? true ? 'Ce champ est requis' : null,
+              ),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(labelText: 'Confirmer mot de passe*'),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Ce champ est requis';
+                  if (value != _passwordController.text) return 'Les mots de passe ne correspondent pas';
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(labelText: 'Téléphone'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          child: Text('Annuler'),
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submitForm,
+          child: _isSubmitting 
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(color: Colors.white),
+                )
+              : Text('Créer'),
+        ),
+      ],
+    );
+  }
+}
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
 
@@ -28,8 +166,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isDarkMode = false;
   final _storage = FlutterSecureStorage();
 
-
-
   // Couleurs dynamiques
   Color get _primaryColor => _isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F9FF);
   Color get _secondaryColor => _isDarkMode ? const Color(0xFF1A237E) : const Color(0xFF1565C0);
@@ -37,7 +173,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Color get _primaryTextColor => _isDarkMode ? Colors.white : Colors.grey[900]!;
   Color get _secondaryTextColor => _isDarkMode ? Colors.white.withOpacity(0.9) : Colors.grey[800]!;
   Color get _cardColor => _isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
-
 
   @override
   void initState() {
@@ -68,21 +203,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-Future<Map<String, dynamic>> _loadStats() async {
+  Future<Map<String, dynamic>> _loadStats() async {
     try {
-      // Récupère les données de l'API
       final apiStats = await IncidentService.getIncidentStats();
-      
-      // Charge les données supplémentaires nécessaires
       final incidents = await IncidentService.getAllIncidents();
       final allUsers = await UserService.getAllUsers();
       final nonAdminUsers = await UserService.getNonAdminUsers();
       final currentUser = await AuthService.getCurrentUser();
+      
       if (currentUser?.role != 'admin') {
         throw Exception('Permissions insuffisantes');
       }
 
-      // Mise à jour des marqueurs pour la carte
       setState(() {
         _markers.clear();
         _markers.addAll(incidents.map((incident) {
@@ -103,13 +235,10 @@ Future<Map<String, dynamic>> _loadStats() async {
         }));
       });
 
-      // Si l'API retourne une erreur, utiliser les données locales
       if (apiStats.containsKey('error')) {
-        // Fallback aux données locales en cas d'erreur
         return _buildLocalStats(incidents, allUsers, nonAdminUsers);
       }
 
-      // Statistiques des 7 derniers jours (calcul côté client)
       final now = DateTime.now();
       final last7Days = List.generate(7, (i) => 
         DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i)));
@@ -127,7 +256,6 @@ Future<Map<String, dynamic>> _loadStats() async {
         };
       }).toList();
 
-      // Trouver les utilisateurs les plus actifs (calcul côté client)
       final userIncidentCount = <int, int>{};
       for (var incident in incidents) {
         final user = allUsers.firstWhere(
@@ -151,7 +279,6 @@ Future<Map<String, dynamic>> _loadStats() async {
         };
       }).toList();
 
-      // Combine les données de l'API avec les calculs côté client
       return {
         'total_incidents': apiStats['total_incidents'] ?? incidents.length,
         'total_non_admin_users': apiStats['total_non_admin_users'] ?? nonAdminUsers.length,
@@ -169,7 +296,6 @@ Future<Map<String, dynamic>> _loadStats() async {
     } catch (e) {
       print('Erreur dans _loadStats: $e');
       
-      // Fallback complet aux données locales en cas d'erreur générale
       try {
         final incidents = await IncidentService.getAllIncidents();
         final allUsers = await UserService.getAllUsers();
@@ -182,9 +308,7 @@ Future<Map<String, dynamic>> _loadStats() async {
     }
   }
 
-  // Méthode helper pour construire les stats locales
   Map<String, dynamic> _buildLocalStats(List<Incident> incidents, List<User> allUsers, List<User> nonAdminUsers) {
-    // Statistiques des 7 derniers jours (calcul côté client)
     final now = DateTime.now();
     final last7Days = List.generate(7, (i) => 
       DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i)));
@@ -202,7 +326,6 @@ Future<Map<String, dynamic>> _loadStats() async {
       };
     }).toList();
 
-    // Trouver les utilisateurs les plus actifs (calcul côté client)
     final userIncidentCount = <int, int>{};
     for (var incident in incidents) {
       final user = allUsers.firstWhere(
@@ -226,7 +349,6 @@ Future<Map<String, dynamic>> _loadStats() async {
       };
     }).toList();
 
-    // Construction des stats locales
     return {
       'total_incidents': incidents.length,
       'total_non_admin_users': nonAdminUsers.length,
@@ -242,9 +364,6 @@ Future<Map<String, dynamic>> _loadStats() async {
       'recent_incidents': incidents.take(5).toList(),
     };
   }
-
-
-
 
   Future<void> _loadIncidentsForMap() async {
     try {
@@ -276,8 +395,6 @@ Future<Map<String, dynamic>> _loadStats() async {
       });
     }
   }
-
-
 
   Widget _buildStatsCard(String title, String value, IconData icon) {
     return Card(
@@ -783,113 +900,14 @@ Future<Map<String, dynamic>> _loadStats() async {
     );
   }
 
-
-void _showAddAdminDialog() {
-  final controllers = {
-    'username': TextEditingController(),
-    'email': TextEditingController(),
-    'password': TextEditingController(),
-    'confirmPassword': TextEditingController(),
-    'phone': TextEditingController(),
-  };
-
-  bool isSubmitting = false;
-
-  showDialog(
-    context: context,
-    barrierDismissible: false, // Empêche la fermeture en cliquant à l'extérieur
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return WillPopScope(
-            onWillPop: () async {
-              return !isSubmitting; // Empêche la fermeture pendant la soumission
-            },
-            child: AlertDialog(
-              title: Text('Ajouter un administrateur'),
-              content: SingleChildScrollView(
-                child: Column(
-                  children: [
-                      TextField(controller: controllers['username'], decoration: InputDecoration(labelText: 'Nom d\'utilisateur*')),
-                      TextField(controller: controllers['email'], keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: 'Email*')),
-                      TextField(controller: controllers['password'], obscureText: true, decoration: InputDecoration(labelText: 'Mot de passe*')),
-                      TextField(controller: controllers['confirmPassword'], obscureText: true, decoration: InputDecoration(labelText: 'Confirmer mot de passe*')),
-                      TextField(controller: controllers['phone'], keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: 'Téléphone')),       
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                  child: Text('Annuler'),
-                ),
-                ElevatedButton(
-                  onPressed: isSubmitting ? null : () async {
-                    if (controllers['password']!.text != controllers['confirmPassword']!.text) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Les mots de passe ne correspondent pas')));
-                      return;
-                    }
-
-                    setState(() => isSubmitting = true);
-                    
-                    try {
-                      final token = await _storage.read(key: 'access_token');
-                      if (token == null) throw Exception('Non authentifié');
-
-                      final response = await http.post(
-                        Uri.parse('http://10.0.2.2:8000/api/users/admin/register/'),
-                        headers: {
-                          'Authorization': 'Bearer $token',
-                          'Content-Type': 'application/json',
-                        },
-                        body: json.encode({
-                          'username': controllers['username']!.text.trim(),
-                          'email': controllers['email']!.text.trim(),
-                          'password': controllers['password']!.text.trim(),
-                          'password2': controllers['confirmPassword']!.text.trim(),
-                          'phone_number': controllers['phone']!.text.trim().isEmpty ? null : controllers['phone']!.text.trim(),
-                        }),
-                      );
-
-                      if (response.statusCode == 201) {
-                        if (mounted) {
-                          Navigator.pop(context);
-                          _loadData();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Admin créé avec succès!'))
-                          );
-                        }
-                      } else {
-                        final errorBody = json.decode(response.body);
-                        throw Exception(errorBody.toString());
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erreur: ${e.toString().replaceFirst('Exception: ', '')}'))
-                        );
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() => isSubmitting = false);
-                      }
-                    }
-                  },
-                  child: isSubmitting 
-                      ? CircularProgressIndicator(color: Colors.white)
-                      : Text('Créer'),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  ).then((_) {
-    controllers.values.forEach((controller) => controller.dispose());
-  });
-}
-
+  void _showAddAdminDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AddAdminDialog(
+        onAdminCreated: _loadData,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -905,7 +923,7 @@ void _showAddAdminDialog() {
         elevation: 1,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          if (_selectedTabIndex == 1) // Seulement visible dans l'onglet Utilisateurs
+          if (_selectedTabIndex == 1)
             IconButton(
               icon: const Icon(Icons.person_add, color: Colors.white),
               onPressed: _showAddAdminDialog,
