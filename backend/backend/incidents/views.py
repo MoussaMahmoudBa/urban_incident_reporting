@@ -9,12 +9,24 @@ from .models import Incident, OfflineIncident
 from .serializers import IncidentSerializer, OfflineIncidentSerializer
 from django.contrib.gis.geos import Point
 User = get_user_model()
+from rest_framework.exceptions import PermissionDenied
+
 
 
 class IncidentStatsView(APIView):
     permission_classes = [IsAdminUser]
     
     def get(self, request):
+        print(f"[DEBUG] User '{request.user.username}' - Role: {request.user.role} - Active: {request.user.is_active}")
+        print(f"Is staff: {request.user.is_staff}")
+
+        if not request.user.role == 'admin':
+            return Response(
+                {'error': 'Permission refusée - Rôle admin requis'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        
         # Statistiques de base
         total_incidents = Incident.objects.count()
         
@@ -57,6 +69,8 @@ class IncidentStatsView(APIView):
                 many=True
             ).data
         }
+
+        
         
         return Response(stats)
 

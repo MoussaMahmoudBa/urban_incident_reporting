@@ -62,7 +62,12 @@ class CustomUser(AbstractUser):
                     old.profile_picture.delete(save=False)
             except CustomUser.DoesNotExist:
                 pass
-                
+
+        if self.role == 'admin':
+            self.is_staff = True
+            self.is_active = True
+            
+                 
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -71,6 +76,31 @@ class CustomUser(AbstractUser):
             self.profile_picture.delete(save=False)
         super().delete(*args, **kwargs)
 
+
+    
+    def create_user(self, username, email, password, **extra_fields):
+            """Crée et enregistre un utilisateur avec le mot de passe hashé"""
+            if not email:
+                raise ValueError("L'email doit être fourni")
+            
+            user = self.model(
+                username=username,
+                email=self.normalize_email(email),
+                **extra_fields
+            )
+            user.set_password(password)
+            user.save(using=self._db)
+            return user
+    
+    def has_module_perms(self, app_label):
+        return self.role == 'admin' or super().has_module_perms(app_label)
+    
+    def has_perm(self, perm, obj=None):
+        return self.role == 'admin' or super().has_perm(perm, obj)
+
+
+    def is_admin(self):
+        return self.role == 'admin' and self.is_active
 
     def __str__(self):
         return f"{self.username} ({self.email or 'pas d\'email'})"

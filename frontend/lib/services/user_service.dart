@@ -96,4 +96,55 @@ class UserService {
       return 0;
     }
   }
+
+
+static Future<User> createAdminUser({
+  required String username,
+  required String email,
+  required String password,
+  String? phoneNumber,
+}) async {
+  try {
+    final token = await _storage.read(key: 'access_token');
+    if (token == null) throw Exception('Non authentifié');
+
+    final response = await http.post(
+      Uri.parse('${_baseUrl}admin/register/'), 
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode({
+        'username': username,
+        'email': email,
+        'password': password,
+        'password2': password,
+        'phone_number': phoneNumber,
+        'role': 'admin',
+        'is_staff': true,  // Ajoutez ce champ
+        'is_active': true  // Ajoutez ce champ
+
+      }),
+    );
+
+    if (response.statusCode == 201) {
+      final responseData = json.decode(response.body);
+      // Gestion des valeurs nulles
+      return User(
+        id: responseData['user_id'] ?? 0, // Valeur par défaut si null
+        username: responseData['username'] ?? '',
+        email: responseData['email'] ?? '',
+        role: responseData['role'] ?? 'admin',
+      );
+    } else {
+      final errorBody = json.decode(response.body);
+      throw Exception('Erreur ${response.statusCode}: $errorBody');
+    }
+  } catch (e) {
+    print('Erreur création admin: $e');
+    rethrow;
+  }
+}
+
+
 }

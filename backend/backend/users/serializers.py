@@ -119,3 +119,22 @@ class BiometricAuthSerializer(serializers.Serializer):
 
     def validate(self, data):
         return data
+
+class AdminRegisterSerializer(UserRegisterSerializer):
+    role = serializers.CharField(default='admin', read_only=False)  # Explicitement déclaré
+    
+    class Meta(UserRegisterSerializer.Meta):
+        extra_kwargs = {
+            **UserRegisterSerializer.Meta.extra_kwargs,
+            'role': {'default': 'admin', 'read_only': False}
+        }
+
+    def create(self, validated_data):
+        validated_data['role'] = 'admin'  # Force le rôle admin
+        validated_data['is_staff'] = True  # Ajoutez cette ligne
+        validated_data['is_active'] = True  # S'assurer que c'est a
+        user = super().create(validated_data)
+        user.is_staff = True
+        user.is_active = True
+        user.save()
+        return user

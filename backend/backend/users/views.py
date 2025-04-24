@@ -8,7 +8,8 @@ from .models import CustomUser
 from .serializers import (
     UserSerializer,
     UserRegisterSerializer,
-    BiometricAuthSerializer
+    BiometricAuthSerializer,
+    AdminRegisterSerializer,
 )
 from .permissions import IsAdminUser, IsCitizenUser
 from rest_framework.views import APIView
@@ -138,6 +139,7 @@ class UserListCreateView(generics.ListCreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAdminUser]
     pagination_class = PageNumberPagination
+    
     def get_queryset(self):
         queryset = User.objects.all()
         exclude_admins = self.request.query_params.get('exclude_admins')
@@ -185,6 +187,46 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
+
+
+class AdminRegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = AdminRegisterSerializer
+    permission_classes = [IsAdminUser]
+
+    def create(self, request, *args, **kwargs):
+        print("Données reçues:", request.data)  # Debug
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            user = serializer.save()
+            refresh = RefreshToken.for_user(user)
+
+            user.is_active = True
+            user.is_staff = True
+            user.save()
+
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                'status': 'success',
+                'user_id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role,  # Ajout du rôle dans la réponse
+                'tokens': {
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh)
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            print("Erreur création admin:", str(e))  # Debug
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -268,3 +310,16 @@ def register_biometric(request):
         return Response({'status': 'success'})
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def debug_user_info(request):
+    """Endpoint de debug pour vérifier les infos utilisateur"""
+    return Response({
+        'username': request.user.username,
+        'role': request.user.role,
+        'is_active': request.user.is_active,
+        'is_staff': request.user.is_staff,
+        'is_superuser': request.user.is_superuser,
+    })

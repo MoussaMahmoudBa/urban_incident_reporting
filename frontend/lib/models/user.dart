@@ -4,7 +4,7 @@ class User {
   final String email;
   final String? phoneNumber;
   final String? profilePictureUrl;
-  final String role; 
+  final String role;
 
   User({
     required this.id,
@@ -17,14 +17,14 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'],
-      username: json['username'],
-      email: json['email'],
-      phoneNumber: json['phone_number'],
+      id: json['id'] ?? 0, // Valeur par défaut si null
+      username: json['username']?.toString() ?? '', // Conversion et valeur par défaut
+      email: json['email']?.toString() ?? '', // Conversion et valeur par défaut
+      phoneNumber: json['phone_number']?.toString(), // Conversion en String si non null
       profilePictureUrl: json['profile_picture'] != null 
           ? 'http://127.0.0.1:8000${json['profile_picture']}'
           : null,
-      role: json['role'] ?? 'citizen',
+      role: json['role']?.toString() ?? 'citizen', // Conversion et valeur par défaut
     );
   }
 
@@ -34,9 +34,8 @@ class User {
       'username': username,
       'email': email,
       'phone_number': phoneNumber,
-      'profile_picture': profilePictureUrl,
+      'profile_picture': profilePictureUrl?.replaceFirst('http://127.0.0.1:8000', ''),
       'role': role,
     };
   }
 }
-

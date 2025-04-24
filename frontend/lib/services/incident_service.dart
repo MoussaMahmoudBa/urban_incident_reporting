@@ -175,6 +175,9 @@ static Future<Map<String, dynamic>> getIncidentStats() async {
     final token = await _storage.read(key: 'access_token');
     if (token == null) throw Exception('Non authentifié');
 
+
+    print('[DEBUG] Token utilisé: $token');
+
     final response = await http.get(
       Uri.parse('http://10.0.2.2:8000/api/incidents/stats/'),
       headers: {
@@ -183,10 +186,17 @@ static Future<Map<String, dynamic>> getIncidentStats() async {
       },
     );
 
-    if (response.statusCode == 200) {
+
+    print('[DEBUG] Réponse du serveur: ${response.statusCode} - ${response.body}');
+
+
+       if (response.statusCode == 200) {
       return json.decode(response.body);
+    } else if (response.statusCode == 403) {
+      throw Exception('Permission refusée - Rôle admin requis');
+    } else {
+      throw Exception('Erreur serveur: ${response.statusCode}');
     }
-    throw Exception('Erreur serveur: ${response.statusCode}');
   } catch (e) {
     print('Erreur dans getIncidentStats: $e');
     rethrow;

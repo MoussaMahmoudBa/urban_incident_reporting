@@ -13,6 +13,7 @@ from .views import (
     login_view,
     UserStatsView,
     toggle_user_status,
+    AdminRegisterView
 )
 
 urlpatterns = [
@@ -32,6 +33,9 @@ urlpatterns = [
     
     # Admin (facultatif)
     path('admin/users/', UserListCreateView.as_view(), name='admin-user-list'),
+    path('admin/register/', AdminRegisterView.as_view(), name='admin-register'),
+
+
 
      # Statistiques et gestion admin
     path('stats/', UserStatsView.as_view(), name='user-stats'),

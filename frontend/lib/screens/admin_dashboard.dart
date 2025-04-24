@@ -7,6 +7,9 @@ import '../models/user.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
@@ -23,6 +26,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _errorMessage = '';
   int _selectedTabIndex = 0;
   bool _isDarkMode = false;
+  final _storage = FlutterSecureStorage();
+
 
 
   // Couleurs dynamiques
@@ -72,6 +77,10 @@ Future<Map<String, dynamic>> _loadStats() async {
       final incidents = await IncidentService.getAllIncidents();
       final allUsers = await UserService.getAllUsers();
       final nonAdminUsers = await UserService.getNonAdminUsers();
+      final currentUser = await AuthService.getCurrentUser();
+      if (currentUser?.role != 'admin') {
+        throw Exception('Permissions insuffisantes');
+      }
 
       // Mise à jour des marqueurs pour la carte
       setState(() {
@@ -93,6 +102,12 @@ Future<Map<String, dynamic>> _loadStats() async {
           );
         }));
       });
+
+      // Si l'API retourne une erreur, utiliser les données locales
+      if (apiStats.containsKey('error')) {
+        // Fallback aux données locales en cas d'erreur
+        return _buildLocalStats(incidents, allUsers, nonAdminUsers);
+      }
 
       // Statistiques des 7 derniers jours (calcul côté client)
       final now = DateTime.now();
@@ -153,8 +168,79 @@ Future<Map<String, dynamic>> _loadStats() async {
       };
     } catch (e) {
       print('Erreur dans _loadStats: $e');
-      rethrow;
+      
+      // Fallback complet aux données locales en cas d'erreur générale
+      try {
+        final incidents = await IncidentService.getAllIncidents();
+        final allUsers = await UserService.getAllUsers();
+        final nonAdminUsers = await UserService.getNonAdminUsers();
+        return _buildLocalStats(incidents, allUsers, nonAdminUsers);
+      } catch (fallbackError) {
+        print('Erreur dans le fallback: $fallbackError');
+        rethrow;
+      }
     }
+  }
+
+  // Méthode helper pour construire les stats locales
+  Map<String, dynamic> _buildLocalStats(List<Incident> incidents, List<User> allUsers, List<User> nonAdminUsers) {
+    // Statistiques des 7 derniers jours (calcul côté client)
+    final now = DateTime.now();
+    final last7Days = List.generate(7, (i) => 
+      DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i)));
+    
+    final incidentsLast7Days = last7Days.map((day) {
+      final count = incidents.where((incident) => 
+        incident.createdAt.year == day.year &&
+        incident.createdAt.month == day.month &&
+        incident.createdAt.day == day.day
+      ).length;
+      
+      return {
+        'date': '${day.day}/${day.month}',
+        'count': count
+      };
+    }).toList();
+
+    // Trouver les utilisateurs les plus actifs (calcul côté client)
+    final userIncidentCount = <int, int>{};
+    for (var incident in incidents) {
+      final user = allUsers.firstWhere(
+        (u) => u.id == incident.userId, 
+        orElse: () => User(id: -1, username: 'Inconnu', email: '', role: ''));
+      if (user.role != 'admin') {
+        userIncidentCount[incident.userId] = (userIncidentCount[incident.userId] ?? 0) + 1;
+      }
+    }
+    
+    final sortedUsers = userIncidentCount.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    final topActiveUsers = sortedUsers.take(3).map((e) {
+      final user = allUsers.firstWhere(
+        (u) => u.id == e.key, 
+        orElse: () => User(id: -1, username: 'Inconnu', email: '', role: ''));
+      return {
+        'user': user,
+        'count': e.value,
+      };
+    }).toList();
+
+    // Construction des stats locales
+    return {
+      'total_incidents': incidents.length,
+      'total_non_admin_users': nonAdminUsers.length,
+      'incidents_by_type': incidents.fold<Map<String, int>>({}, (map, incident) {
+        map[incident.incidentType] = (map[incident.incidentType] ?? 0) + 1;
+        return map;
+      }).entries.map((e) => {
+        'incident_type': e.key,
+        'count': e.value
+      }).toList(),
+      'incidents_last_7_days': incidentsLast7Days,
+      'top_users': topActiveUsers,
+      'recent_incidents': incidents.take(5).toList(),
+    };
   }
 
 
@@ -697,6 +783,114 @@ Future<Map<String, dynamic>> _loadStats() async {
     );
   }
 
+
+void _showAddAdminDialog() {
+  final controllers = {
+    'username': TextEditingController(),
+    'email': TextEditingController(),
+    'password': TextEditingController(),
+    'confirmPassword': TextEditingController(),
+    'phone': TextEditingController(),
+  };
+
+  bool isSubmitting = false;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false, // Empêche la fermeture en cliquant à l'extérieur
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return WillPopScope(
+            onWillPop: () async {
+              return !isSubmitting; // Empêche la fermeture pendant la soumission
+            },
+            child: AlertDialog(
+              title: Text('Ajouter un administrateur'),
+              content: SingleChildScrollView(
+                child: Column(
+                  children: [
+                      TextField(controller: controllers['username'], decoration: InputDecoration(labelText: 'Nom d\'utilisateur*')),
+                      TextField(controller: controllers['email'], keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: 'Email*')),
+                      TextField(controller: controllers['password'], obscureText: true, decoration: InputDecoration(labelText: 'Mot de passe*')),
+                      TextField(controller: controllers['confirmPassword'], obscureText: true, decoration: InputDecoration(labelText: 'Confirmer mot de passe*')),
+                      TextField(controller: controllers['phone'], keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: 'Téléphone')),       
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting ? null : () async {
+                    if (controllers['password']!.text != controllers['confirmPassword']!.text) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Les mots de passe ne correspondent pas')));
+                      return;
+                    }
+
+                    setState(() => isSubmitting = true);
+                    
+                    try {
+                      final token = await _storage.read(key: 'access_token');
+                      if (token == null) throw Exception('Non authentifié');
+
+                      final response = await http.post(
+                        Uri.parse('http://10.0.2.2:8000/api/users/admin/register/'),
+                        headers: {
+                          'Authorization': 'Bearer $token',
+                          'Content-Type': 'application/json',
+                        },
+                        body: json.encode({
+                          'username': controllers['username']!.text.trim(),
+                          'email': controllers['email']!.text.trim(),
+                          'password': controllers['password']!.text.trim(),
+                          'password2': controllers['confirmPassword']!.text.trim(),
+                          'phone_number': controllers['phone']!.text.trim().isEmpty ? null : controllers['phone']!.text.trim(),
+                        }),
+                      );
+
+                      if (response.statusCode == 201) {
+                        if (mounted) {
+                          Navigator.pop(context);
+                          _loadData();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Admin créé avec succès!'))
+                          );
+                        }
+                      } else {
+                        final errorBody = json.decode(response.body);
+                        throw Exception(errorBody.toString());
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erreur: ${e.toString().replaceFirst('Exception: ', '')}'))
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => isSubmitting = false);
+                      }
+                    }
+                  },
+                  child: isSubmitting 
+                      ? CircularProgressIndicator(color: Colors.white)
+                      : Text('Créer'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  ).then((_) {
+    controllers.values.forEach((controller) => controller.dispose());
+  });
+}
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -711,6 +905,12 @@ Future<Map<String, dynamic>> _loadStats() async {
         elevation: 1,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          if (_selectedTabIndex == 1) // Seulement visible dans l'onglet Utilisateurs
+            IconButton(
+              icon: const Icon(Icons.person_add, color: Colors.white),
+              onPressed: _showAddAdminDialog,
+              tooltip: 'Ajouter un admin',
+            ),
           IconButton(
             icon: Icon(
               _isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
